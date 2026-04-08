@@ -4,7 +4,7 @@ const db = require("../config/database");
 
 // CREATE 
 router.post("/new", (req,res)=>{
-  const { first_name,last_name,emp_email,mobile,job_title,emp_role } = req.body;
+  const { first_name,last_name,emp_email,mobile,job_title,emp_role,quotation_count } = req.body;
 
   if(!first_name || !last_name || !emp_email || !mobile || !job_title || !emp_role){
     return res.status(400).json({message:"All Field Required"});
@@ -12,11 +12,11 @@ router.post("/new", (req,res)=>{
 
   const sql = `
   INSERT INTO teammember
-  (first_name,last_name,emp_email,mobile,job_title,emp_role)
-  VALUES (?,?,?,?,?,?)
+  (first_name,last_name,emp_email,mobile,job_title,emp_role,quotation_count)
+  VALUES (?,?,?,?,?,?,?)
   `;
 
-  db.query(sql,[first_name,last_name,emp_email,mobile,job_title,emp_role],
+  db.query(sql,[first_name,last_name,emp_email,mobile,job_title,emp_role,quotation_count || 0],
     (err,result)=>{
       if(err) return res.status(500).json(err);
       res.json({success:true});
@@ -36,16 +36,16 @@ router.get("/", (req,res)=>{
 // Edit 
 
 router.put("/:id", (req,res)=>{
-  const { first_name,last_name,emp_email,mobile,job_title,emp_role } = req.body;
+  const { first_name,last_name,emp_email,mobile,job_title,emp_role,quotation_count } = req.body;
 
   const sql = `
    UPDATE teammember 
-   SET first_name=?, last_name=?, emp_email=?, mobile=?, job_title=?, emp_role=?
+   SET first_name=?, last_name=?, emp_email=?, mobile=?, job_title=?, emp_role=?, quotation_count=?
    WHERE id=?
   `;
 
   db.query(sql,
-    [first_name,last_name,emp_email,mobile,job_title,emp_role,req.params.id],
+    [first_name,last_name,emp_email,mobile,job_title,emp_role,quotation_count || 0,req.params.id],
     (err)=>{
       if(err) return res.status(500).json(err);
       res.json({success:true});

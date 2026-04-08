@@ -22,16 +22,17 @@ const Walkins = () =>{
       customer_name: "",
        mobile_number: "",
        location_city: "",
-       walkin_date: "",
+       walkin_date: new Date().toISOString().slice(0, 10),
        purpose: "",
        staff_name: "",
        walkin_status: "New",
       followup_required: "Default",
-      followup_date: "",
+      followup_date: new Date().toISOString().slice(0, 10),
       followup_notes: "",
       reminder_required: "Default",
-      reminder_date: "",
+      reminder_date: new Date().toISOString().slice(0, 10),
        reminder_notes: "",
+       reference: "",
     });
 
     // Fetch Details
@@ -73,11 +74,13 @@ const saveWalkins = async (e) => {
       `http://localhost:3000/api/Walkins/${editId}`,
       payload
     );
+    alert("Successfully Updated");
   } else {
     await axios.post(
       "http://localhost:3000/api/Walkins",
       payload
     );
+    alert("Successfully Created");
   }
 
   fetchWalkins();
@@ -99,16 +102,15 @@ const openEdit = async (id) => {
       purpose: data.purpose || "",
       staff_name: data.staff_name || "",
       walkin_status: data.walkin_status || "New",
-
       followup_required: data.followup_required || "Default",
       followup_date: data.followup_date ? data.followup_date.split("T")[0] : "",
       followup_notes: data.followup_notes || "",
-
       reminder_required: data.reminder_required || "Default",
       reminder_date: data.reminder_date
         ? data.reminder_date.split("T")[0]
         : "",
       reminder_notes: data.reminder_notes || "",
+      reference: data.reference || "",
     });
 
     setEditId(id);
@@ -123,6 +125,7 @@ const openEdit = async (id) => {
 // Delete:
 
  const deletefield = async (id) => {
+  if(!window.confirm("Are you sure?")) return;
   try {
     await axios.delete(`http://localhost:3000/api/Walkins/${id}`);
     fetchWalkins();
@@ -196,7 +199,7 @@ const formatDate = (date) => {
 
           <div className="mt-2">
             <button
-              onClick={() => tabopen(true)}
+              onClick={() => { setIsEdit(false); setForm({customer_name: "", mobile_number: "", location_city: "", walkin_date: new Date().toISOString().slice(0, 10), purpose: "", staff_name: "", walkin_status: "New", followup_required: "Default", followup_date: new Date().toISOString().slice(0, 10), followup_notes: "", reminder_required: "Default", reminder_date: new Date().toISOString().slice(0, 10), reminder_notes: "", reference: ""}); setOpen(true); }}
               className="bg-[#FF3355] text-white w-12 h-12 rounded-full flex justify-center items-center shadow-lg hover:bg-[#e62848] "
             >
               <Plus size={24} />
@@ -215,8 +218,8 @@ const formatDate = (date) => {
               {/*  */}
 
                  <div className="flex justify-between items-center ">
-                   <h2 className="text-2xl font-semibold mb-8 text-gray-700 mt-[-20px]">
-                        Add A Walkins Summary
+                    <h2 className="text-2xl font-semibold mb-8 text-gray-700 mt-[-20px]">
+                        {isEdit ? "Edit Walkins Summary" : "Add A Walkins Summary"}
                      </h2>
                     <span className="mt-[-20px] x-icon" >
                      <X onClick={() => setOpen(false)} />
@@ -256,8 +259,14 @@ const formatDate = (date) => {
                 </div>
                 {/*  */}
                 <div className="grid grid-cols-4 items-center gap-6">
-                   <label htmlFor="" className="text-sm text-gray-600 text-left">Staf Name</label>
+                   <label htmlFor="" className="text-sm text-gray-600 text-left">Staff Name</label>
                    <input type="text" value={form.staff_name} onChange={handleChange}  name="staff_name" className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
+                </div>
+
+                {/* Reference */}
+                <div className="grid grid-cols-4 items-center gap-6">
+                   <label htmlFor="" className="text-sm text-gray-600 text-left">Reference</label>
+                   <input type="text" value={form.reference} onChange={handleChange} name="reference" className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
                 </div>
   
               {/*Call outcome  */}
@@ -282,146 +291,147 @@ const formatDate = (date) => {
               {outcomeOpen && (
                  <div className="absolute left-0 right-0 bg-white border rounded-md mt-1 shadow-lg z-20">
                  {["New", "Converted", "Disqualified"].map((outcome) => (
-          <div
-            key={outcome}
-            onClick={() => {
-              setForm({ ...form, walkin_status  : outcome });
-              setOutcomeOpen(false);
-            }}
-            className="px-3 py-2 cursor-pointer hover:bg-blue-600 hover:text-white text-left"
-          >
-            {outcome}
-          </div>
-        ))}
-      </div>
-    )}
-  </div>
-  </div>
+           <div
+             key={outcome}
+             onClick={() => {
+               setForm({ ...form, walkin_status  : outcome });
+               setOutcomeOpen(false);
+             }}
+             className="px-3 py-2 cursor-pointer hover:bg-blue-600 hover:text-white text-left"
+           >
+             {outcome}
+           </div>
+         ))}
+       </div>
+     )}
+   </div>
+   </div>
 
-   {/* Follw Up */}
-       <div className="flex justify-between items-center text-sm text-gray-600 more">
-                <span className="text-black font-[Times-Roman-Serif] text-[22px]">More Details</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer"  checked={showMoreDetails}
-                    onChange={() => setShowMoreDetails(!showMoreDetails)} />
-                  <div className="w-10 h-5 bg-gray-300 rounded-full peer peer-checked:bg-blue-500 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:h-4 after:w-4 after:rounded-full after:transition peer-checked:after:translate-x-5"></div>
-                </label>
-              </div>
+    {/* Follw Up */}
+        <div className="flex justify-between items-center text-sm text-gray-600 more">
+                 <span className="text-black font-[Times-Roman-Serif] text-[22px]">More Details</span>
+                 <label className="relative inline-flex items-center cursor-pointer">
+                   <input type="checkbox" className="sr-only peer"  checked={showMoreDetails}
+                     onChange={() => setShowMoreDetails(!showMoreDetails)} />
+                   <div className="w-10 h-5 bg-gray-300 rounded-full peer peer-checked:bg-blue-500 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:h-4 after:w-4 after:rounded-full after:transition peer-checked:after:translate-x-5"></div>
+                 </label>
+               </div>
 
-     {showMoreDetails && (
-                <div className="items-center pt-[50px] h-[40vh]">
-                  <div className="pb-[250px]">
-                   <div className=" flex items-center gap-2">
-                     <label className="text-sm text-gray-600 text-left ">Follow Up </label>
-                     <div className="relative left-[60px]">
-        {/* INPUT */}
-                      <input type="text" readOnly value={form.followup_required} name="followup_required" placeholder="Select Follow Up"   onClick={() => setFollowOpen(!followOpen)}
-                      className="border rounded-md px-3 py-2 outline-none w-full cursor-pointer "/>
-    
-        {/* ICON */}
-                     <ChevronDown
-                       size={18}
-                       className={`absolute top-3.5 right-4 cursor-pointer transition-transform duration-300 ${
-                       followOpen ? "rotate-180" : ""
-                         }`}
-                      onClick={() => setFollowOpen(!followOpen)} />
-    
-             {/* DROPDOWN OPTIONS */}
-                  {followOpen && (
-                     <div className="absolute left-0 right-0 bg-white border rounded-md mt-1 shadow-lg z-20">
-                     {["Default","Yes","No"].map((outcome) => (
-              <div
-                key={outcome}
-                onClick={() => {
-                  setForm({ ...form, followup_required:outcome });
-                  setFollowOpen(false);
-                }}
-                className="px-3 py-2 cursor-pointer hover:bg-blue-600 hover:text-white text-left"
-              >
-                {outcome}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-       <div className="flex items-center gap-10 relative left-[80px]">
-           <label htmlFor="" className="text-sm text-gray-600 w-[110px] whitespace-nowrap ml-[10px]">Followup Date</label>
-           <input type="Date" value={form.followup_date} onChange={handleChange} name="followup_date" className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]" />
-         </div>
-      </div>
-       <div className="flex items-center gap-4 mt-[25px]">
-            <label className="text-sm text-gray-600 w-[110px] whitespace-nowrap">
-              Followup Notes
-            </label>
-    
-            <input
-              type="text"
-              onChange={handleChange}
-              value={form.followup_notes}
-              name="followup_notes"
-              className="border outline-none rounded-md px-3 py-2 w-[200px] bg-white ml-[20px]"
-            />
-          </div>
-    
-          {/* Remainder */}
-    
-    
-                   <div className="items-center more">
-                   <div className=" flex items-center gap-2">
-                     <label className="text-sm text-gray-600 text-left ">Remainder Up </label>
-                     <div className="relative left-[30px]">
-        {/* INPUT */}
-                      <input type="text" readOnly value={form.reminder_required} name="reminder_required" placeholder="Select Follow Up"   onClick={() => setRemainderDetails(!remainderDetails)}
-                      className="border rounded-md px-3 py-2 outline-none w-full cursor-pointer "/>
-    
-        {/* ICON */}
-                     <ChevronDown
-                       size={18}
-                       className={`absolute top-3.5 right-4 cursor-pointer transition-transform duration-300 ${
-                       remainderDetails ? "rotate-180" : ""
-                         }`}
-                      onClick={() => setRemainderDetails(!remainderDetails)} />
-    
-             {/* DROPDOWN OPTIONS */}
-                  {remainderDetails && (
-                     <div className="absolute left-0 right-0 bg-white border rounded-md mt-1 shadow-lg z-20">
-                     {["Default","Yes","No"].map((outcome) => (
-              <div
+      {showMoreDetails && (
+                 <div className="items-center pt-[50px] h-auto">
+                   <div className="pb-[20px]">
+                    <div className=" flex items-center gap-2">
+                      <label className="text-sm text-gray-600 text-left ">Follow Up </label>
+                      <div className="relative left-[60px]">
+         {/* INPUT */}
+                       <input type="text" readOnly value={form.followup_required} name="followup_required" placeholder="Select Follow Up"   onClick={() => setFollowOpen(!followOpen)}
+                       className="border rounded-md px-3 py-2 outline-none w-full cursor-pointer "/>
+     
+         {/* ICON */}
+                      <ChevronDown
+                        size={18}
+                        className={`absolute top-3.5 right-4 cursor-pointer transition-transform duration-300 ${
+                        followOpen ? "rotate-180" : ""
+                          }`}
+                       onClick={() => setFollowOpen(!followOpen)} />
+     
+              {/* DROPDOWN OPTIONS */}
+                   {followOpen && (
+                      <div className="absolute left-0 right-0 bg-white border rounded-md mt-1 shadow-lg z-20">
+                      {["Default","Yes","No"].map((outcome) => (
+               <div
+                 key={outcome}
                  onClick={() => {
-                 setForm({ ...form, reminder_required:outcome });
-                 setRemainderDetails(false);
-                }}
-                className="px-3 py-2 cursor-pointer hover:bg-blue-600 hover:text-white text-left"
-              >
-                {outcome}
-              </div>
-            ))}
+                   setForm({ ...form, followup_required:outcome });
+                   setFollowOpen(false);
+                 }}
+                 className="px-3 py-2 cursor-pointer hover:bg-blue-600 hover:text-white text-left"
+               >
+                 {outcome}
+               </div>
+             ))}
+           </div>
+         )}
+       </div>
+        <div className="flex items-center gap-10 relative left-[80px]">
+            <label htmlFor="" className="text-sm text-gray-600 w-[110px] whitespace-nowrap ml-[10px]">Followup Date</label>
+            <input type="Date" value={form.followup_date} onChange={handleChange} name="followup_date" className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]" />
           </div>
-        )} 
-      </div>
-       <div className="flex items-center gap-10 relative left-[50px]">
-           <label htmlFor="" className="text-sm text-gray-600 w-[110px] whitespace-nowrap ml-[10px]">Remainder Date</label>
-           <input type="Date" value={form.reminder_date} onChange={handleChange} name="reminder_date" className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]" />
-         </div>
-      </div>
-       <div className="flex items-center gap-4 mt-[25px]">
-            <label className="text-sm text-gray-600 w-[110px] whitespace-nowrap">
-              Remainder Notes
-            </label>
-    
-            <input
-              type="text"
-              onChange={handleChange}
-              value={form.reminder_notes}
-              name="reminder_notes"
-              className="border outline-none rounded-md px-3 py-2 w-[200px] bg-white ml-[20px]"
-            />
+       </div>
+        <div className="flex items-center gap-4 mt-[25px]">
+             <label className="text-sm text-gray-600 w-[110px] whitespace-nowrap">
+               Followup Notes
+             </label>
+     
+             <input
+               type="text"
+               onChange={handleChange}
+               value={form.followup_notes}
+               name="followup_notes"
+               className="border outline-none rounded-md px-3 py-2 w-[200px] bg-white ml-[20px]"
+             />
+           </div>
+     
+           {/* Remainder */}
+     
+     
+                    <div className="items-center more mt-6">
+                    <div className=" flex items-center gap-2">
+                      <label className="text-sm text-gray-600 text-left ">Remainder Up </label>
+                      <div className="relative left-[30px]">
+         {/* INPUT */}
+                       <input type="text" readOnly value={form.reminder_required} name="reminder_required" placeholder="Select Follow Up"   onClick={() => setRemainderDetails(!remainderDetails)}
+                       className="border rounded-md px-3 py-2 outline-none w-full cursor-pointer "/>
+     
+         {/* ICON */}
+                      <ChevronDown
+                        size={18}
+                        className={`absolute top-3.5 right-4 cursor-pointer transition-transform duration-300 ${
+                        remainderDetails ? "rotate-180" : ""
+                          }`}
+                       onClick={() => setRemainderDetails(!remainderDetails)} />
+     
+              {/* DROPDOWN OPTIONS */}
+                   {remainderDetails && (
+                      <div className="absolute left-0 right-0 bg-white border rounded-md mt-1 shadow-lg z-20">
+                      {["Default","Yes","No"].map((outcome) => (
+               <div
+                  key={outcome}
+                  onClick={() => {
+                  setForm({ ...form, reminder_required:outcome });
+                  setRemainderDetails(false);
+                 }}
+                 className="px-3 py-2 cursor-pointer hover:bg-blue-600 hover:text-white text-left"
+               >
+                 {outcome}
+               </div>
+             ))}
+           </div>
+         )} 
+       </div>
+        <div className="flex items-center gap-10 relative left-[50px]">
+            <label htmlFor="" className="text-sm text-gray-600 w-[110px] whitespace-nowrap ml-[10px]">Remainder Date</label>
+            <input type="Date" value={form.reminder_date} onChange={handleChange} name="reminder_date" className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]" />
           </div>
-      </div>   
-      </div>
-      </div>    
-      
-      )}
+       </div>
+        <div className="flex items-center gap-4 mt-[25px]">
+             <label className="text-sm text-gray-600 w-[110px] whitespace-nowrap">
+               Remainder Notes
+             </label>
+     
+             <input
+               type="text"
+               onChange={handleChange}
+               value={form.reminder_notes}
+               name="reminder_notes"
+               className="border outline-none rounded-md px-3 py-2 w-[200px] bg-white ml-[20px]"
+             />
+           </div>
+       </div>   
+       </div>
+       </div>    
+       
+       )}
 
   {/* submit and  close */}
       <div className="flex gap-4 pt-4 more2">
@@ -456,6 +466,7 @@ const formatDate = (date) => {
                 <th className="border px-4 py-3 w-[140px]">Walkin Date</th>
                 <th className="border px-4 py-3">Service</th>
                 <th className="border px-4 py-3">Staff</th>
+                <th className="border px-4 py-3">Reference</th>
                 <th className="border px-4 py-3 w-[90px] text-center">Actions</th>
               </tr>
             </thead>
@@ -487,6 +498,9 @@ const formatDate = (date) => {
                   <td className="border px-4 py-2 truncate">
                     {W.staff_name}
                   </td>
+                  <td className="border px-4 py-2">
+                    {W.reference}
+                  </td>
                   <td className="border px-4 py-2 text-center">
                     <div className="flex justify-center gap-2">
                       <button
@@ -515,6 +529,6 @@ const formatDate = (date) => {
   </div>
 
      </center>
-   )
+    )
 }
 export default Walkins;

@@ -8,7 +8,9 @@ export default function Register() {
 const [, setLoading] = useState(false);
   const [, setOtpSent] = useState(false);
   
-const API = "https://crm-backend-347y.onrender.com";
+// const API = "https://crm-backend-347y.onrender.com";
+
+const API = "http://localhost:3000";
 
   const [form, setForm] = useState({
     first_name: "",

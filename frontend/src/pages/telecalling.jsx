@@ -34,17 +34,17 @@ const formatDate = (date) => {
        customer_name: "",
        mobile_number: "",
        location_city: "",
-       call_date: "",
+       call_date: new Date().toISOString().slice(0, 10),
        service_name: "",
        staff_name: "",
        call_outcome: "New",
       followup_required: "Default",
-      followup_date: "",
+      followup_date: new Date().toISOString().slice(0, 10),
       followup_notes: "",
       reminder_required: "Default",
-      reminder_date: "",
+      reminder_date: new Date().toISOString().slice(0, 10),
        reminder_notes: "",
-
+       reference: "",
   })
 
   // Background Scroll
@@ -119,13 +119,13 @@ const saveTelecall = async (e) => {
       service_name: data.service_name || "",
       staff_name: data.staff_name || "",
       call_outcome: data.call_outcome || "New",
-
       followup_required: data.followup_required || "Default",
       followup_date: data.followup_date || "",
       followup_notes: data.followup_notes || "",
       reminder_required: data.reminder_required || "Default",
       reminder_date: data.reminder_date || "",
       reminder_notes: data.reminder_notes || "",
+      reference: data.reference || "",
     });
 
     setEditId(id);
@@ -204,7 +204,7 @@ useEffect(() => {
 
           <div className="mt-2">
             <button
-              onClick={() => tabopen(true)}
+              onClick={() => { setIsEdit(false); setForm({customer_name: "", mobile_number: "", location_city: "", call_date: new Date().toISOString().slice(0, 10), service_name: "", staff_name: "", call_outcome: "New", followup_required: "Default", followup_date: new Date().toISOString().slice(0, 10), followup_notes: "", reminder_required: "Default", reminder_date: new Date().toISOString().slice(0, 10), reminder_notes: "", reference: ""}); setOpen(true); }}
               className="bg-[#FF3355] text-white w-12 h-12 rounded-full flex justify-center items-center shadow-lg hover:bg-[#e62848] "
             >
               <Plus size={24} />
@@ -222,8 +222,8 @@ useEffect(() => {
               {/*  */}
 
                  <div className="flex justify-between items-center ">
-                   <h2 className="text-2xl font-semibold mb-8 text-gray-700 mt-[-20px]">
-                        Add A Telecalling Summary
+                    <h2 className="text-2xl font-semibold mb-8 text-gray-700 mt-[-20px]">
+                        {isEdit ? "Edit Telecalling Summary" : "Add A Telecalling Summary"}
                      </h2>
                     <span className="mt-[-20px] x-icon" >
                      <X onClick={() => setOpen(false)} />
@@ -263,8 +263,14 @@ useEffect(() => {
                 </div>
                 {/*  */}
                 <div className="grid grid-cols-4 items-center gap-6">
-                   <label htmlFor="" className="text-sm text-gray-600 text-left">Asigned Staf</label>
+                   <label htmlFor="" className="text-sm text-gray-600 text-left">Asigned Staff</label>
                    <input type="text" value={form.staff_name} onChange={handleChange}  name="staff_name" className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
+                </div>
+
+                {/* Reference */}
+                <div className="grid grid-cols-4 items-center gap-6">
+                   <label htmlFor="" className="text-sm text-gray-600 text-left">Reference</label>
+                   <input type="text" value={form.reference} onChange={handleChange} name="reference" className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
                 </div>
   
               {/*Call outcome  */}
@@ -289,240 +295,244 @@ useEffect(() => {
               {outcomeOpen && (
                  <div className="absolute left-0 right-0 bg-white border rounded-md mt-1 shadow-lg z-20">
                  {["New", "Converted", "Disqualified"].map((outcome) => (
-          <div
-            key={outcome}
-            onClick={() => {
-              setForm({ ...form, call_outcome: outcome });
-              setOutcomeOpen(false);
-            }}
-            className="px-3 py-2 cursor-pointer hover:bg-blue-600 hover:text-white text-left"
-          >
-            {outcome}
-          </div>
-        ))}
-      </div>
-    )}
-  </div>
-  </div>
+           <div
+             key={outcome}
+             onClick={() => {
+               setForm({ ...form, call_outcome: outcome });
+               setOutcomeOpen(false);
+             }}
+             className="px-3 py-2 cursor-pointer hover:bg-blue-600 hover:text-white text-left"
+           >
+             {outcome}
+           </div>
+         ))}
+       </div>
+     )}
+   </div>
+   </div>
 
-  {/* Follow UP */}
-              <div className="flex justify-between items-center text-sm text-gray-600 more">
-                <span className="text-black font-[Times-Roman-Serif] text-[22px]">More Details</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer"  checked={showMoreDetails}
-                    onChange={() => setShowMoreDetails(!showMoreDetails)} />
-                  <div className="w-10 h-5 bg-gray-300 rounded-full peer peer-checked:bg-blue-500 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:h-4 after:w-4 after:rounded-full after:transition peer-checked:after:translate-x-5"></div>
-                </label>
-              </div>
-         {showMoreDetails && (
-            <div className="items-center pt-[50px] h-[40vh] ">
-              <div className="pb-[250px] ">
+   {/* Follow UP */}
+               <div className="flex justify-between items-center text-sm text-gray-600 more">
+                 <span className="text-black font-[Times-Roman-Serif] text-[22px]">More Details</span>
+                 <label className="relative inline-flex items-center cursor-pointer">
+                   <input type="checkbox" className="sr-only peer"  checked={showMoreDetails}
+                     onChange={() => setShowMoreDetails(!showMoreDetails)} />
+                   <div className="w-10 h-5 bg-gray-300 rounded-full peer peer-checked:bg-blue-500 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:h-4 after:w-4 after:rounded-full after:transition peer-checked:after:translate-x-5"></div>
+                 </label>
+               </div>
+          {showMoreDetails && (
+             <div className="items-center pt-[50px] h-auto ">
+               <div className="pb-[20px] ">
 
-               <div className=" flex items-center gap-2">
-                 <label className="text-sm text-gray-600 text-left ">Follow Up </label>
-                 <div className="relative left-[60px]">
+                <div className=" flex items-center gap-2">
+                  <label className="text-sm text-gray-600 text-left ">Follow Up </label>
+                  <div className="relative left-[60px]">
     {/* INPUT */}
-                  <input type="text"  readOnly value={form.followup_required} name="followup_required" placeholder="Select Follow Up"   onClick={() => setFollowOpen(!followOpen)}
-                  className="border rounded-md px-3 py-2 outline-none w-full cursor-pointer "/>
+                   <input type="text"  readOnly value={form.followup_required} name="followup_required" placeholder="Select Follow Up"   onClick={() => setFollowOpen(!followOpen)}
+                   className="border rounded-md px-3 py-2 outline-none w-full cursor-pointer "/>
 
     {/* ICON */}
-                 <ChevronDown
-                   size={18}
-                   className={`absolute top-3.5 right-4 cursor-pointer transition-transform duration-300 ${
-                   followOpen ? "rotate-180" : ""
-                     }`}
-                  onClick={() => setFollowOpen(!followOpen)} />
+                  <ChevronDown
+                    size={18}
+                    className={`absolute top-3.5 right-4 cursor-pointer transition-transform duration-300 ${
+                    followOpen ? "rotate-180" : ""
+                      }`}
+                   onClick={() => setFollowOpen(!followOpen)} />
 
-         {/* DROPDOWN OPTIONS */}
-              {followOpen && (
-                 <div className="absolute left-0 right-0 bg-white border rounded-md mt-1 shadow-lg z-20">
-                 {["Default","Yes","No"].map((outcome) => (
-          <div
-            key={outcome}
-            onClick={() => {
-              setForm({ ...form, followup_required:outcome });
-              setFollowOpen(false);
-            }}
-            className="px-3 py-2 cursor-pointer hover:bg-blue-600 hover:text-white text-left"
-          >
-            {outcome}
-          </div>
-        ))}
+          {/* DROPDOWN OPTIONS */}
+               {followOpen && (
+                  <div className="absolute left-0 right-0 bg-white border rounded-md mt-1 shadow-lg z-20">
+                  {["Default","Yes","No"].map((outcome) => (
+           <div
+             key={outcome}
+             onClick={() => {
+               setForm({ ...form, followup_required:outcome });
+               setFollowOpen(false);
+             }}
+             className="px-3 py-2 cursor-pointer hover:bg-blue-600 hover:text-white text-left"
+           >
+             {outcome}
+           </div>
+         ))}
+       </div>
+     )}
+   </div>
+    <div className="flex items-center gap-10 relative left-[80px]">
+        <label htmlFor="" className="text-sm text-gray-600 w-[110px] whitespace-nowrap ml-[10px]">Followup Date</label>
+        <input onChange={handleChange} value={form.followup_date} type="Date" name="followup_date" className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]" />
       </div>
-    )}
-  </div>
-   <div className="flex items-center gap-10 relative left-[80px]">
-       <label htmlFor="" className="text-sm text-gray-600 w-[110px] whitespace-nowrap ml-[10px]">Followup Date</label>
-       <input onChange={handleChange} value={form.followup_date} type="Date" name="followup_date" className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]" />
-     </div>
-  </div>
-   <div className="flex items-center gap-4 mt-[25px]">
-        <label className="text-sm text-gray-600 w-[110px] whitespace-nowrap">
-          Followup Notes
-        </label>
+   </div>
+    <div className="flex items-center gap-4 mt-[25px]">
+         <label className="text-sm text-gray-600 w-[110px] whitespace-nowrap">
+           Followup Notes
+         </label>
 
-        <input
-          type="text"
-          onChange={handleChange}
-          value={form.followup_notes}
-          name="followup_notes"
-          className="border outline-none rounded-md px-3 py-2 w-[200px] bg-white ml-[20px]"
-        />
-      </div>
+         <input
+           type="text"
+           onChange={handleChange}
+           value={form.followup_notes}
+           name="followup_notes"
+           className="border outline-none rounded-md px-3 py-2 w-[200px] bg-white ml-[20px]"
+         />
+       </div>
 
-      {/* Remainder */}
+       {/* Remainder */}
 
 
-               <div className="items-center more">
-               <div className=" flex items-center gap-2">
-                 <label className="text-sm text-gray-600 text-left ">Remainder Up </label>
-                 <div className="relative left-[30px]">
+                <div className="items-center more mt-6">
+                <div className=" flex items-center gap-2">
+                  <label className="text-sm text-gray-600 text-left ">Remainder Up </label>
+                  <div className="relative left-[30px]">
     {/* INPUT */}
-                  <input type="text"   readOnly  value={form.reminder_required} name="reminder_required" placeholder="Select Follow Up"   onClick={() => setRemainderDetails(!remainderDetails)}
-                  className="border rounded-md px-3 py-2 outline-none w-full cursor-pointer "/>
+                   <input type="text"   readOnly  value={form.reminder_required} name="reminder_required" placeholder="Select Follow Up"   onClick={() => setRemainderDetails(!remainderDetails)}
+                   className="border rounded-md px-3 py-2 outline-none w-full cursor-pointer "/>
 
     {/* ICON */}
-                 <ChevronDown
-                   size={18}
-                   className={`absolute top-3.5 right-4 cursor-pointer transition-transform duration-300 ${
-                   remainderDetails ? "rotate-180" : ""
-                     }`}
-                  onClick={() => setRemainderDetails(!remainderDetails)} />
+                  <ChevronDown
+                    size={18}
+                    className={`absolute top-3.5 right-4 cursor-pointer transition-transform duration-300 ${
+                    remainderDetails ? "rotate-180" : ""
+                      }`}
+                   onClick={() => setRemainderDetails(!remainderDetails)} />
 
-         {/* DROPDOWN OPTIONS */}
-              {remainderDetails && (
-                 <div className="absolute left-0 right-0 bg-white border rounded-md mt-1 shadow-lg z-20">
-                 {["Default","Yes","No"].map((outcome) => (
-          <div
-            key={outcome}
-            onClick={() => {
-              setForm({ ...form, reminder_required:outcome });
-              setRemainderDetails(false);
-            }}
-            className="px-3 py-2 cursor-pointer hover:bg-blue-600 hover:text-white text-left"
-          >
-            {outcome}
-          </div>
-        ))}
+          {/* DROPDOWN OPTIONS */}
+               {remainderDetails && (
+                  <div className="absolute left-0 right-0 bg-white border rounded-md mt-1 shadow-lg z-20">
+                  {["Default","Yes","No"].map((outcome) => (
+           <div
+             key={outcome}
+             onClick={() => {
+               setForm({ ...form, reminder_required:outcome });
+               setRemainderDetails(false);
+             }}
+             className="px-3 py-2 cursor-pointer hover:bg-blue-600 hover:text-white text-left"
+           >
+             {outcome}
+           </div>
+         ))}
+       </div>
+     )} 
+   </div>
+    <div className="flex items-center gap-10 relative left-[50px]">
+        <label htmlFor="" className="text-sm text-gray-600 w-[110px] whitespace-nowrap ml-[10px]">Remainder Date</label>
+        <input type="Date" value={form.reminder_date} onChange={handleChange} name="reminder_date" className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]" />
       </div>
-    )} 
-  </div>
-   <div className="flex items-center gap-10 relative left-[50px]">
-       <label htmlFor="" className="text-sm text-gray-600 w-[110px] whitespace-nowrap ml-[10px]">Remainder Date</label>
-       <input type="Date" value={form.reminder_date} onChange={handleChange} name="reminder_date" className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]" />
+   </div>
+    <div className="flex items-center gap-4 mt-[25px]">
+         <label className="text-sm text-gray-600 w-[110px] whitespace-nowrap">
+           Remainder Notes
+         </label>
+
+         <input
+           type="text"
+           onChange={handleChange}
+           value={form.reminder_notes}
+           name="reminder_notes"
+           className="border outline-none rounded-md px-3 py-2 w-[200px] bg-white ml-[20px]"
+         />
+       </div>
+   </div>   
+   </div>   
+   </div> 
+   
+   )}
+   
+   {/* submit and  close */}
+      <div className="flex gap-4 pt-4 more2">
+                 <button
+                   type="submit"
+                   className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                   Submit
+                 </button>
+
+                 <button
+                   onClick={() => setOpen(false)}
+                   type="button"
+                   className="bg-gray-400 text-white px-6 py-2 rounded-lg hover:bg-red-500"
+                 >
+                   Close
+                 </button>
+               </div>
+         </form>
+       </div>
+       
+        {/*Table  */}    
+      </div>
+      <div className="bg-white shadow rounded-xl overflow-x-auto mt-5 ">
+   <table className="w-full text-sm border border-gray-300 table-fixed w-[140%]">
+     <thead className="bg-[#f8faf9]">
+       <tr className="text-black font-[Times-New-Roman] uppercase text-xs ">
+         <th className="border px-4 py-3 w-[50px] text-center">ID</th>
+         <th className="border px-4 py-3">Customer Name</th>
+         <th className="border px-4 py-3">Mobile Number</th>
+         <th className="border px-4 py-3">City</th>
+         <th className="border px-4 py-3 w-[140px]">Call Date</th>
+         <th className="border px-4 py-3">Service</th>
+         <th className="border px-4 py-3">Staff</th>
+         <th className="border px-4 py-3">Reference</th>
+         <th className="border px-4 py-3 w-[90px] text-center">Actions</th>
+       </tr>
+     </thead>
+
+     <tbody className="text-sm font-[Times-New-Roman] text-center">
+       {Telecalls.map((T) => (
+         <tr
+           key={T.id}
+           className="hover:bg-gray-100 hover:text-black transition"
+         >
+           <td className="border px-4 py-2 text-center">
+             {T.id}
+           </td>
+           <td className="border px-4 py-2 ">
+             {T.customer_name}
+           </td>
+           <td className="border px-4 py-2 whitespace-nowrap">
+             {T.mobile_number}
+           </td>
+           <td className="border px-4 py-2 truncate">
+             {T.location_city}
+           </td>
+           <td className="border px-4 py-2 ">
+             {formatDate(T.call_date)}
+           </td>
+           <td className="border px-4 py-2">
+             {T.service_name}
+           </td>
+           <td className="border px-4 py-2 truncate">
+             {T.staff_name}
+           </td>
+           <td className="border px-4 py-2">
+             {T.reference}
+           </td>
+           <td className="border px-4 py-2 text-center">
+             <div className="flex justify-center gap-2">
+               <button
+                 type="button"
+                 onClick={() => deletefield(T.id)}
+                 className="text-red-500 hover:text-red-700"
+               >
+                 <Trash2 size={16} />
+               </button>
+
+               <button
+                 type="button"
+                 onClick={() => openEdit(T.id)}
+                 className="text-green-600 hover:text-green-800"
+               >
+                 <Edit size={16} />
+               </button>
+             </div>
+           </td>
+         </tr>
+       ))}
+     </tbody>
+   </table>
+ </div>
+
      </div>
-  </div>
-   <div className="flex items-center gap-4 mt-[25px]">
-        <label className="text-sm text-gray-600 w-[110px] whitespace-nowrap">
-          Remainder Notes
-        </label>
+   
 
-        <input
-          type="text"
-          onChange={handleChange}
-          value={form.reminder_notes}
-          name="reminder_notes"
-          className="border outline-none rounded-md px-3 py-2 w-[200px] bg-white ml-[20px]"
-        />
-      </div>
-  </div>   
-  </div>   
-  </div> 
-  
-  )}
-  
-  {/* submit and  close */}
-     <div className="flex gap-4 pt-4 more2">
-                <button
-                  type="submit"
-                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
-                  Submit
-                </button>
-
-                <button
-                  onClick={() => setOpen(false)}
-                  type="button"
-                  className="bg-gray-400 text-white px-6 py-2 rounded-lg hover:bg-red-500"
-                >
-                  Close
-                </button>
-              </div>
-        </form>
-      </div>
-      
-       {/*Table  */}    
-     </div>
-     <div className="bg-white shadow rounded-xl overflow-x-auto mt-5 ">
-  <table className="w-full text-sm border border-gray-300 table-fixed w-[140%]">
-    <thead className="bg-[#f8faf9]">
-      <tr className="text-black font-[Times-New-Roman] uppercase text-xs ">
-        <th className="border px-4 py-3 w-[50px] text-center">ID</th>
-        <th className="border px-4 py-3">Customer Name</th>
-        <th className="border px-4 py-3">Mobile Number</th>
-        <th className="border px-4 py-3">City</th>
-        <th className="border px-4 py-3 w-[140px]">Call Date</th>
-        <th className="border px-4 py-3">Service</th>
-        <th className="border px-4 py-3">Staff</th>
-        <th className="border px-4 py-3 w-[90px] text-center">Actions</th>
-      </tr>
-    </thead>
-
-    <tbody className="text-sm font-[Times-New-Roman] text-center">
-      {Telecalls.map((T) => (
-        <tr
-          key={T.id}
-          className="hover:bg-gray-100 hover:text-black transition"
-        >
-          <td className="border px-4 py-2 text-center">
-            {T.id}
-          </td>
-          <td className="border px-4 py-2 ">
-            {T.customer_name}
-          </td>
-          <td className="border px-4 py-2 whitespace-nowrap">
-            {T.mobile_number}
-          </td>
-          <td className="border px-4 py-2 truncate">
-            {T.location_city}
-          </td>
-          <td className="border px-4 py-2 ">
-            {formatDate(T.call_date)}
-          </td>
-          <td className="border px-4 py-2">
-            {T.service_name}
-          </td>
-          <td className="border px-4 py-2 truncate">
-            {T.staff_name}
-          </td>
-          <td className="border px-4 py-2 text-center">
-            <div className="flex justify-center gap-2">
-              <button
-                type="button"
-                onClick={() => deletefield(T.id)}
-                className="text-red-500 hover:text-red-700"
-              >
-                <Trash2 size={16} />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => openEdit(T.id)}
-                className="text-green-600 hover:text-green-800"
-              >
-                <Edit size={16} />
-              </button>
-            </div>
-          </td>
-        </tr>
-      ))}
-    </tbody>
-  </table>
-</div>
-
-    </div>
-  
-
-  </center>
-   )
+   </center>
+    )
 }
 export default Telecall;

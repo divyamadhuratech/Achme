@@ -21,7 +21,7 @@ const Payments = () =>{
   const [form, setForm] = useState({
     invoice_id: "",
     amount: "",
-    payment_date: "",
+    payment_date: new Date().toISOString().slice(0, 10),
     payment_method: "",
     Transaction_ID: "",
     invoice_email: false,
@@ -107,7 +107,7 @@ const resetForm = () => {
   setForm({
     invoice_id: "",
     amount: "",
-    payment_date: "",
+    payment_date: new Date().toISOString().slice(0, 10),
     payment_method: "",
     Transaction_ID: "",
     invoice_email: false,

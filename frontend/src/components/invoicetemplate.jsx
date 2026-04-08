@@ -1,14 +1,20 @@
 import React,{useState,useEffect} from "react";
  import axios from "axios";
  import Logo from "../images/logo.svg";
-const Invoice = ({quotationId}) => {
+const Invoice = ({quotationId, performaInvoiceId}) => {
    const [rows, setRows] = useState([]);
 
   useEffect(() => {
-    axios
-      .get(`http://localhost:3000/api/quotations/${quotationId}`)
-      .then((res) => setRows(res.data));
-  }, [quotationId]);
+    if (quotationId) {
+      axios
+        .get(`http://localhost:3000/api/quotations/${quotationId}`)
+        .then((res) => setRows(res.data));
+    } else if (performaInvoiceId) {
+      axios
+        .get(`http://localhost:3000/api/performainvoice/${performaInvoiceId}`)
+        .then((res) => setRows(res.data));
+    }
+  }, [quotationId, performaInvoiceId]);
 
   if (!rows.length) return <p>No invoice found</p>;
 
@@ -37,16 +43,16 @@ const formatDate = (date) =>
           </div>
 
           <div className="text-right">
-            <h1 className="text-3xl font-bold text-lime-400">QUOTATION</h1>
-            <p className="text-sm ">Quotaion No: #{header.quotation_id}</p>
-            <p className="text-sm"> Quotation Date: {formatDate(header.quotation_date)}</p>
+            <h1 className="text-3xl font-bold text-lime-400">{quotationId ? "QUOTATION" : "PERFORMA INVOICE"}</h1>
+            <p className="text-sm ">{quotationId ? "Quotation" : "Performa Invoice"} No: #{header.quotation_id || header.performainvoice_id}</p>
+            <p className="text-sm"> {quotationId ? "Quotation" : "Performa Invoice"} Date: {formatDate(header.quotation_date || header.invoice_date)}</p>
           </div>
         </div>
 
         {/* BILL INFO */}
         <div className="grid grid-cols-2 gap-6 p-6">
           <div className="text-left">
-            <h3 className="text-lime-600 font-semibold mb-2">Quotation To:</h3>
+            <h3 className="text-lime-600 font-semibold mb-2">{quotationId ? "Quotation" : "Performa Invoice"} To:</h3>
             <p className="font-semibold">{header.customer_name}</p>
             <p className="text-sm text-gray-600">{header.location_city}</p>
             <p className="text-sm">📞 {header.mobile_number}</p>
@@ -54,7 +60,7 @@ const formatDate = (date) =>
           </div>
 
           <div className="text-right ">
-            <h3 className="text-lime-600 font-semibold mb-2">Quotation From:</h3>
+            <h3 className="text-lime-600 font-semibold mb-2">{quotationId ? "Quotation" : "Performa Invoice"} From:</h3>
             <p className="font-semibold">Madhura Technologies</p>
             <p className="text-sm text-gray-600">Managing Director, Company Ltd</p>
             <p className="text-sm">📞 +123 4567 8910</p>
@@ -79,7 +85,11 @@ const formatDate = (date) =>
                 <tr key={i} className="border-b text-sm">
                   <td className="p-3 border-r">{item.product_number ?? i+1}</td>
                   <td className="p-3 border-r">
-                    <p className="font-semibold ">{item.description}</p>
+                    <div className="font-semibold text-left">
+                      {item.description.split(",").map((part, index) => (
+                        <div key={index} className="mb-0.5">{part.trim()}</div>
+                      ))}
+                    </div>
                   </td>
                   <td className="p-3 text-right border-r">{item.price}</td>
                   <td className="p-3 text-center border-r">{item.quantity}</td>

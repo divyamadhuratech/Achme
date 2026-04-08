@@ -22,18 +22,17 @@ const Fields = () =>{
     customer_name: "",
     mobile_number: "",
     location_city: "",
-    visit_date: "",
+    visit_date: new Date().toISOString().slice(0, 10),
     purpose: "",
     staff_name: "",
     field_outcome: "New",
-
     followup_required: "Default",
-    followup_date: "",
+    followup_date: new Date().toISOString().slice(0, 10),
     followup_notes: "",
-
     reminder_required: "Default",
-    reminder_date: "",
+    reminder_date: new Date().toISOString().slice(0, 10),
     reminder_notes: "",
+    reference: "",
 });
 
 // fetch all data;
@@ -62,7 +61,7 @@ const handleSubmit = async (e) => {
 
   const payload = {
     ...form,
-    visit_date: form.visit_date || today, // 🔥 FIX
+    visit_date: form.visit_date || today,
   };
 
   if (isEdit) {
@@ -70,11 +69,13 @@ const handleSubmit = async (e) => {
       `http://localhost:3000/api/fields/${editId}`,
       payload
     );
+    alert("Successfully Updated");
   } else {
     await axios.post(
       "http://localhost:3000/api/fields/new",
       payload
     );
+    alert("Successfully Created");
   }
 
   fetchFields();
@@ -108,18 +109,17 @@ const openEdit = async (id) => {
       purpose: data.purpose || "",
       staff_name: data.staff_name || "",
       field_outcome: data.field_outcome || "New",
-
       followup_required: data.followup_required || "Default",
       followup_date: data.followup_date
         ? data.followup_date.split("T")[0]
         : "",
       followup_notes: data.followup_notes || "",
-
       reminder_required: data.reminder_required || "Default",
       reminder_date: data.reminder_date
         ? data.reminder_date.split("T")[0]
         : "",
       reminder_notes: data.reminder_notes || "",
+      reference: data.reference || "",
     });
 
     setEditId(id);
@@ -134,6 +134,7 @@ const openEdit = async (id) => {
 
 // delete 
     const deletefield = async (id) => {
+  if(!window.confirm("Are you sure?")) return;
   try {
     await axios.delete(`http://localhost:3000/api/fields/${id}`);
     fetchFields();
@@ -198,7 +199,7 @@ useEffect(() => {
 
           <div className="mt-2">
             <button
-              onClick={() => tabopen(true)}
+              onClick={() => { setIsEdit(false); setForm({customer_name: "", mobile_number: "", location_city: "", visit_date: new Date().toISOString().slice(0, 10), purpose: "", staff_name: "", field_outcome: "New", followup_required: "Default", followup_date: new Date().toISOString().slice(0, 10), followup_notes: "", reminder_required: "Default", reminder_date: new Date().toISOString().slice(0, 10), reminder_notes: "", reference: ""}); setOpen(true); }}
               className="bg-[#FF3355] text-white w-12 h-12 rounded-full flex justify-center items-center shadow-lg hover:bg-[#e62848] "
             >
               <Plus size={24} />
@@ -216,8 +217,8 @@ useEffect(() => {
               {/*  */}
 
                  <div className="flex justify-between items-center ">
-                   <h2 className="text-2xl font-semibold mb-8 text-gray-700 mt-[-20px]">
-                        Add A Field Summary
+                    <h2 className="text-2xl font-semibold mb-8 text-gray-700 mt-[-20px]">
+                        {isEdit ? "Edit Field Summary" : "Add A Field Summary"}
                      </h2>
                     <span className="mt-[-20px] x-icon" >
                      <X onClick={() => setOpen(false)} />
@@ -257,8 +258,14 @@ useEffect(() => {
                 </div>
                 {/*  */}
                 <div className="grid grid-cols-4 items-center gap-6">
-                   <label htmlFor="" className="text-sm text-gray-600 text-left">Staf Name</label>
+                   <label htmlFor="" className="text-sm text-gray-600 text-left">Staff Name</label>
                    <input type="text" name="staff_name" value={form.staff_name} onChange={handleChange} className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
+                </div>
+
+                {/* Reference */}
+                <div className="grid grid-cols-4 items-center gap-6">
+                   <label htmlFor="" className="text-sm text-gray-600 text-left">Reference</label>
+                   <input type="text" name="reference" value={form.reference} onChange={handleChange} className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
                 </div>
   
               {/*Call outcome  */}
@@ -283,35 +290,35 @@ useEffect(() => {
               {outcomeOpen && (
                  <div className="absolute left-0 right-0 bg-white border rounded-md mt-1 shadow-lg z-20">
                  {["New", "Converted", "Disqualified"].map((outcome) => (
-          <div
-            key={outcome}
-            onClick={() => {
-              setForm({ ...form, field_outcome: outcome });
-              setOutcomeOpen(false);
-            }}
-            className="px-3 py-2 cursor-pointer hover:bg-blue-600 hover:text-white text-left"
-          >
-            {outcome}
-          </div>
-        ))}
-      </div>
-    )}
-  </div>
-  </div>
+           <div
+             key={outcome}
+             onClick={() => {
+               setForm({ ...form, field_outcome: outcome });
+               setOutcomeOpen(false);
+             }}
+             className="px-3 py-2 cursor-pointer hover:bg-blue-600 hover:text-white text-left"
+           >
+             {outcome}
+           </div>
+         ))}
+       </div>
+     )}
+   </div>
+   </div>
 
-   {/* Follw Up */}
-       <div className="flex justify-between items-center text-sm text-gray-600 more">
-                <span className="text-black font-[Times-Roman-Serif] text-[22px]">More Details</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer"  checked={showMoreDetails}
-                    onChange={() => setShowMoreDetails(!showMoreDetails)} />
-                  <div className="w-10 h-5 bg-gray-300 rounded-full peer peer-checked:bg-blue-500 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:h-4 after:w-4 after:rounded-full after:transition peer-checked:after:translate-x-5"></div>
-                </label>
-              </div>
+    {/* Follw Up */}
+        <div className="flex justify-between items-center text-sm text-gray-600 more">
+                 <span className="text-black font-[Times-Roman-Serif] text-[22px]">More Details</span>
+                 <label className="relative inline-flex items-center cursor-pointer">
+                   <input type="checkbox" className="sr-only peer"  checked={showMoreDetails}
+                     onChange={() => setShowMoreDetails(!showMoreDetails)} />
+                   <div className="w-10 h-5 bg-gray-300 rounded-full peer peer-checked:bg-blue-500 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:h-4 after:w-4 after:rounded-full after:transition peer-checked:after:translate-x-5"></div>
+                 </label>
+               </div>
 
               {showMoreDetails && (
-                 <div className="items-center pt-[50px] h-[40vh] ">
-                   <div className="pb-[250px] ">
+                 <div className="items-center pt-[50px] h-auto ">
+                   <div className="pb-[20px] ">
      
                     <div className=" flex items-center gap-2">
                       <label className="text-sm text-gray-600 text-left ">Follow Up </label>
@@ -360,6 +367,7 @@ useEffect(() => {
                type="text"
                onChange={handleChange}
                name="followup_notes"
+               value={form.followup_notes}
                className="border outline-none rounded-md px-3 py-2 w-[200px] bg-white ml-[20px]"
              />
            </div>
@@ -367,7 +375,7 @@ useEffect(() => {
            {/* Remainder */}
      
      
-                    <div className="items-center more">
+                    <div className="items-center more mt-6">
                     <div className=" flex items-center gap-2">
                       <label className="text-sm text-gray-600 text-left ">Remainder Up </label>
                       <div className="relative left-[30px]">
@@ -415,6 +423,7 @@ useEffect(() => {
                type="text"
                onChange={handleChange}
                name="reminder_notes"
+               value={form.reminder_notes}
                className="border outline-none rounded-md px-3 py-2 w-[200px] bg-white ml-[20px]"
              />
            </div>
@@ -451,21 +460,22 @@ useEffect(() => {
          <div className=" bg-white shadow rounded-xl  overflow-auto mt-[20px]">
             <table className="w-full text-sm  border border-gray-200 border-collapse ">
                <thead className="bg-[#f8faf9] rounded-xl">
-                   <tr className="text-balck font-[Times-New-Roman] border-b border-gray-300 uppercase text-xs">
+                   <tr className="text-black font-[Times-New-Roman] border-b border-gray-300 uppercase text-xs">
                     <th className="px-4 py-3 border">ID</th>
                      <th className=" px-4 py-3 border">Customer Name</th>
                       <th className="px-4 py-3 border">Mobile Number</th>
-                       <th className=" px-4 py-3 border">location city</th>
+                       <th className=" px-4 py-3 border">Location City</th>
                          <th className=" px-4 py-3 border">Visit Date</th>
-                          <th className=" px-4 py-3 border">service Name</th>
+                          <th className=" px-4 py-3 border">Purpose</th>
                            <th className=" px-4 py-3 border">Staff Name</th>
-                            <th className="  border">Actions</th>
+                           <th className=" px-4 py-3 border">Reference</th>
+                             <th className=" px-4 py-3 border">Actions</th>
                    </tr>
                </thead>
-                 <tbody className=" text-sm font-[Times-New-Roman]">
+                 <tbody className=" text-sm font-[Times-New-Roman] text-center">
                   {fields.map((f) =>(
 
-                   <tr key={f.id} className="border-b border-gray-200 hover:text-green-500 cursor-pointer">
+                   <tr key={f.id} className="border-b border-gray-200 hover:bg-gray-50 transition cursor-pointer">
                     <td className="px-4 py-3 border">{f.id}</td>
                     <td className="px-4 py-3 border">{f.customer_name}</td>
                     <td className="px-4 py-3 border">{f.mobile_number}</td>
@@ -473,19 +483,20 @@ useEffect(() => {
                     <td className="px-4 py-3 border">{formatDate(f.visit_date)}</td>
                     <td className="px-4 py-3 border">{f.purpose}</td>
                     <td className="px-4 py-3 border">{f.staff_name}</td>
+                    <td className="px-4 py-3 border">{f.reference}</td>
                      
                     <td className="px-4 py-3 border">
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 justify-center">
                      <button
                       type="button"
-                       onClick={() => deletefield(f.id)}
+                       onClick={(e) => { e.stopPropagation(); deletefield(f.id); }}
                        className="text-red-500 hover:text-red-700">
                        <Trash2 size={18} />
                        </button>
 
                         <button
                          type="button"
-                          onClick={() => openEdit(f.id)}
+                          onClick={(e) => { e.stopPropagation(); openEdit(f.id); }}
                           className="text-green-600 hover:text-green-800">
                           <Edit size={18} />
                          </button>
@@ -499,7 +510,7 @@ useEffect(() => {
             </table>
          </div>
          
-     </center>
-   )
+      </center>
+    )
 }
 export default Fields;

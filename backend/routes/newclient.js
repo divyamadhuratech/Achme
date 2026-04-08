@@ -7,8 +7,8 @@ router.get("/search", (req, res) => {
   const search = `%${req.query.name || ""}%`;
 
   db.query(
-    "SELECT company_name FROM clients WHERE company_name LIKE ?",
-    [search],
+    "SELECT id, name, company_name FROM clients WHERE name LIKE ? OR company_name LIKE ?",
+    [search, search],
     (err, results) => {
       if (err) return res.status(500).json({ message: "Search failed" });
       res.json(results);
@@ -16,39 +16,51 @@ router.get("/search", (req, res) => {
   );
 });
 
-/* CREATE CLIENT */
-router.post("/new", (req, res) => {
-  const {
-    company_name,
-    client_firstname,
-    client_lastname,
-    client_email,
-  } = req.body;
+/* GET ALL CLIENTS */
+router.get("/", (req, res) => {
+  db.query("SELECT * FROM clients ORDER BY id DESC", (err, results) => {
+    if (err) return res.status(500).json(err);
+    res.json(results);
+  });
+});
 
-  if (!company_name || !client_firstname || !client_lastname || !client_email) {
-    return res.status(400).json({ message: "All  required" });
+/* CREATE CLIENT */
+router.post("/", (req, res) => {
+  const { name, company_name, email, phone, address, state, pincode } = req.body;
+  if (!name || !email) {
+    return res.status(400).json({ message: "Name and email are required" });
   }
 
   const sql = `
-    INSERT INTO clients
-    (company_name, client_firstname, client_lastname, client_email)
-    VALUES (?,?,?,?)
+    INSERT INTO clients (name, company_name, email, phone, address, state, pincode)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `;
+  db.query(sql, [name, company_name, email, phone, address, state, pincode], (err, result) => {
+    if (err) return res.status(500).json({ message: "Insert failed", error: err });
+    res.json({ message: "Client created successfully", id: result.insertId });
+  });
+});
 
-  db.query(
-    sql,
-    [company_name, client_firstname, client_lastname, client_email],
-    (err, result) => {
-      if (err) {
-        if (err.code === "ER_DUP_ENTRY") {
-          return res.status(409).json({ message: "Client already exists" });
-        }
-        return res.status(500).json({ message: "Insert failed" });
-      }
+/* UPDATE CLIENT */
+router.put("/:id", (req, res) => {
+  const { name, company_name, email, phone, address, state, pincode } = req.body;
+  const sql = `
+    UPDATE clients 
+    SET name=?, company_name=?, email=?, phone=?, address=?, state=?, pincode=? 
+    WHERE id=?
+  `;
+  db.query(sql, [name, company_name, email, phone, address, state, pincode, req.params.id], (err) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: "Client updated successfully" });
+  });
+});
 
-      res.json({ success: true, client_id: result.insertId });
-    }
-  );
+/* DELETE CLIENT */
+router.delete("/:id", (req, res) => {
+  db.query("DELETE FROM clients WHERE id=?", [req.params.id], (err) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: "Client deleted successfully" });
+  });
 });
 
 module.exports = router;

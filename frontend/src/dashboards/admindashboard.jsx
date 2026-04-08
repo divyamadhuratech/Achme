@@ -22,6 +22,7 @@ const { user } = useAuth();
   const [leads, setLeads] = useState([]);
   const [walkins, setWalkins] = useState([]);
   const [fields, setFields] = useState([]);
+  const [team, setTeam] = useState([]);
 
   const [activeTelecall, setActiveTelecall] = useState("New");
   const [activeWalkin, setActiveWalkin] = useState("New");
@@ -33,15 +34,17 @@ const { user } = useAuth();
   /* ================= FETCH ================= */
 
   const fetchAll = async () => {
-    const [t, w, f] = await Promise.all([
+    const [t, w, f, tm] = await Promise.all([
       axios.get("http://localhost:3000/api/Telecalls"),
       axios.get("http://localhost:3000/api/Walkins"),
       axios.get("http://localhost:3000/api/Fields"),
+      axios.get("http://localhost:3000/api/teammember"),
     ]);
 
     setLeads(t.data);
     setWalkins(w.data);
     setFields(f.data);
+    setTeam(tm.data);
   };
 
   useEffect(() => {
@@ -501,44 +504,80 @@ const Card = ({ title, value, percent, sub, positive }) => (
           />
         </div>
 
-       {/* Revenue Chart */}
-        <div className="rounded-xl p-6 bg-shell text-shell-text shadow-lg w-[100%] h-[380px]">
-        <div className="flex justify-between items-center mb-4">
-          <div>
-            <h2 className="text-lg font-semibold">Revenue</h2>
-            <p className="text-2xl font-bold">$16,400.12
-              <span className="text-green-400 text-sm ml-2">↑ 10%</span>
-            </p>
+       {/* Revenue Section */}
+       <div className="mt-20">
+        {/* Revenue Chart */}
+        <div className="rounded-xl p-6 bg-shell text-shell-text shadow-lg w-full h-[400px]">
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h2 className="text-lg font-semibold">Revenue</h2>
+              <p className="text-2xl font-bold">$16,400.12
+                <span className="text-green-400 text-sm ml-2">↑ 10%</span>
+              </p>
+            </div>
+            <select className="bg-orange-500 text-white px-3 py-2 rounded-md outline-none">
+              <option>Month</option>
+            </select>
           </div>
-          <select className="bg-orange-500 text-white px-3 py-2 rounded-md outline-none">
-            <option>Month</option>
-          </select>
-        </div>
 
-        <div className="flex gap-4 mb-3 text-sm">
-          <span className="flex items-center gap-2">
-            <span className="w-2 h-2 bg-indigo-500 rounded-full"></span> Profit
-          </span>
-          <span className="flex items-center gap-2">
-            <span className="w-2 h-2 bg-gray-300 rounded-full"></span> Loss
-          </span>
-        </div>
+          <div className="flex gap-4 mb-3 text-sm">
+            <span className="flex items-center gap-2">
+              <span className="w-2 h-2 bg-indigo-500 rounded-full"></span> Profit
+            </span>
+            <span className="flex items-center gap-2">
+              <span className="w-2 h-2 bg-gray-300 rounded-full"></span> Loss
+            </span>
+          </div>
 
-        <div className="h-[250px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data}>
-              <XAxis dataKey="month" stroke="#aaa" />
-              <YAxis stroke="#aaa" />
-              <Tooltip />
-              <Bar dataKey="profit" fill="#6366f1" radius={[6, 6, 0, 0]} />
-              <Bar dataKey="loss" fill="#c7d2fe" radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <div className="h-[270px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data}>
+                <XAxis dataKey="month" stroke="#aaa" />
+                <YAxis stroke="#aaa" />
+                <Tooltip />
+                <Bar dataKey="profit" fill="#6366f1" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="loss" fill="#c7d2fe" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
+
+      {/* Team Section - New Row */}
+      <div className="mt-10 mb-10">
+        <div className="rounded-xl p-6 bg-shell text-shell-text shadow-lg w-full min-h-[380px] overflow-hidden flex flex-col">
+          <h2 className="text-lg font-semibold mb-4 text-center border-b pb-2 uppercase tracking-wider">Team Member Quotation Summary</h2>
+          <div className="flex-1 overflow-y-auto custom-scrollbar">
+            <table className="w-full text-center border-collapse">
+              <thead className="sticky top-0 bg-[#2d3748] z-10">
+                <tr className="text-xs uppercase text-gray-400 font-bold border-b border-gray-700">
+                  <th className="p-3">Team Member Name</th>
+                  <th className="p-3">Quotation Count</th>
+                </tr>
+              </thead>
+              <tbody>
+                {team.length === 0 ? (
+                  <tr><td colSpan="2" className="py-10 text-gray-500 italic">No team data available</td></tr>
+                ) : (
+                  team.map((t, idx) => (
+                    <tr key={idx} className="border-b border-gray-700 hover:bg-white/5 transition">
+                      <td className="p-4 font-medium">{t.first_name} {t.last_name}</td>
+                      <td className="p-4">
+                        <span className="bg-blue-600/20 text-blue-400 px-4 py-1.5 rounded-full text-sm font-bold ring-1 ring-blue-500/30">
+                          {t.quotation_count || 0}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
         
       </div>
+    </div>
   );
 };
 

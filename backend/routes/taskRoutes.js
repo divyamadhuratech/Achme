@@ -16,14 +16,8 @@ router.get("/", (req, res) => {
 /*  CREATE TASK  */
 router.post("/", (req, res) => {
   const {
-    project_name,
-    staff_name,
-    task_title,
-    project_status,
-    project_priority,
-    client_name,
-    created_date,
-    due_date
+    project_name, staff_name, task_title,
+    project_status, project_priority, client_name, created_date, due_date
   } = req.body;
 
   const sql = `
@@ -32,37 +26,28 @@ router.post("/", (req, res) => {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
-  db.query(
-    sql,
-    [
-      project_name,
-      task_title,
-      project_status,
-      project_priority,
-      staff_name,
-      client_name,
-      created_date,
-      due_date
-    ],
+  db.query(sql,
+    [project_name, task_title, project_status, project_priority, staff_name, client_name, created_date, due_date],
     (err, result) => {
-      if (err) return res.status(500).json(err);
+      if (err) {
+        console.error("Task create error:", err);
+        return res.status(500).json({ message: err.message });
+      }
 
       const taskId = result.insertId;
 
-      // Task Activity
+      // Non-fatal: log activity if table exists
       db.query(
         "INSERT INTO task_activity (task_id, action, message) VALUES (?, ?, ?)",
-        [taskId, "Created", `Task "${task_title}" created`]
+        [taskId, "Created", `Task "${task_title}" created`],
+        (logErr) => { if (logErr) console.warn("task_activity insert skipped:", logErr.message); }
       );
 
-      // Notification
+      // Non-fatal: notification if table exists
       db.query(
         "INSERT INTO notifications (task_id, title, description) VALUES (?, ?, ?)",
-        [
-          taskId,
-          "New Task",
-          `Task "${task_title}" added (${project_priority})`
-        ]
+        [taskId, "New Task", `Task "${task_title}" added (${project_priority})`],
+        (notifErr) => { if (notifErr) console.warn("notifications insert skipped:", notifErr.message); }
       );
 
       res.json({ message: "Task created", id: taskId });

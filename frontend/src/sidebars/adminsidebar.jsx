@@ -11,7 +11,8 @@ import {
   Headphones,
   Users2,
   BarChart2,
-  ChevronDown
+  ChevronDown,
+   Wrench
 } from "lucide-react";
 import "../Styles/tailwind.css"
 import { Link } from "react-router-dom";
@@ -22,7 +23,7 @@ const Sidebar = () => {
 
   const menu = [
     { icon: <Home size={20} />, title: "Dashboard",path: "/dashboard" },
-    { icon: <Users size={20} />, title: "Customers", subitems: ["Clients", "Client Users"] },
+    { icon: <Users size={20} />, title: "Customers", subitems: [{label: "Clients", path: "/dashboard/clients"}] },
     { icon: <FolderKanban size={20} />, title: "Projects",  subitems: [
         { label: "Project", path: "/project" },
         { label: "Templates", path: "/project-templates" }
@@ -40,16 +41,19 @@ const Sidebar = () => {
       {label:"Invoice",path:"/dashboard/invoice"}, 
       {label:"Payments",path:"/dashboard/payments"},
       {label:"Estimates",path:"/dashboard/estimates"},
-      {label:"Subsriptions",path:"/subsriptions"},
-      {label:"Products",path:"/products"},
-      {label:"Expenses",path:"/expenses"}] },
+      {label:"Performa Invoice",path:"/dashboard/performainvoice"}
+    ] },
       
     { icon: <FileText size={20} />, title: "Proposals",path:"/dashboard/proposal"},
+    {
+  icon: <Wrench size={20} />,
+  title: "Services",
+  subitems: [
+    { label: "products", path: "/dashboard/products" }
+  ]
+},
     { icon: <Briefcase size={20} />, title: "Contracts",
-     subitems:[{label:"Contarcts", path:"/dashboard/contracts"},
-      {label:"Templates", path:"/dashboard/templates"}
-     ]},
-    { icon: <Headphones size={20} />, title: "Support" ,subitems:[{label: "Chat", path:"/dashboard/chat"}] },
+     subitems:[{label:"Contracts", path:"/dashboard/contracts"}] },
     { icon: <Users2 size={20} />, title: "Team",subitems:[{label: "Team Member", path:"/dashboard/team"},"Time Sheets" ] },
     { icon: <BarChart2 size={20} />, title: "Reports" }
   ];

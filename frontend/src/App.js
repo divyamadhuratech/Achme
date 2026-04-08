@@ -23,8 +23,10 @@ import Payments from "./pages/payment";
 import Estimate  from "./pages/estimate";
 import Contracts from "./pages/contract";
 import Team from "./pages/teammember";
-
- import FollowupList from "./components/followuplist";
+import Products from "./pages/products";
+import FollowupList from "./components/followuplist";
+import Clients from "./pages/clients";
+import PerformaInvoice from "./pages/performainvoice";
 
 export default function App() {
   return (
@@ -43,6 +45,7 @@ export default function App() {
             <Route path="telecalling" element={<Telecall />} />
             <Route path="walkins" element={<Walkins />} />
             <Route path="field" element={<Fields />} />
+               <Route path="products" element={<Products />} />
             <Route path="proposal" element={<Proposals />} />
             <Route path="task" element={<Task />} />
            <Route path="invoice" element={<Invoicepage/>} />
@@ -51,6 +54,8 @@ export default function App() {
           <Route path="contracts" element={< Contracts/>} />
           <Route path="team" element={< Team/>} />
            <Route path="followupslist" element={<FollowupList />} />
+           <Route path="clients" element={<Clients />} />
+           <Route path="performainvoice" element={<PerformaInvoice />} />
            
           </Route>
         </Routes>

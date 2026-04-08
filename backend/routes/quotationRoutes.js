@@ -340,4 +340,54 @@ router.delete("/:id", (req, res) => {
 
 
 
+const nodemailer = require("nodemailer");
+
+router.post("/send-email/:id", (req, res) => {
+  const { id } = req.params;
+
+  db.query(
+    `SELECT q.*, c.email, c.customer_name 
+     FROM quotations q 
+     JOIN customers c ON q.customer_id = c.id 
+     WHERE q.id = ?`,
+    [id],
+    async (err, rows) => {
+      if (err) return res.status(500).json(err);
+      if (!rows.length) return res.status(404).json({ message: "Quotation not found" });
+
+      const quotation = rows[0];
+      if (!quotation.email) return res.status(400).json({ message: "Customer has no email" });
+
+      try {
+        const transporter = nodemailer.createTransport({
+          service: "gmail",
+          auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS,
+          },
+        });
+
+        await transporter.sendMail({
+          from: `"Sales Team" <${process.env.EMAIL_USER}>`,
+          to: quotation.email,
+          subject: `Proposal/Quotation #${quotation.id}`,
+          html: `
+            <h2>Hello ${quotation.customer_name},</h2>
+            <p>Please find the details of your quotation below:</p>
+            <p><strong>Quotation Date:</strong> ${new Date(quotation.quotation_date).toLocaleDateString()}</p>
+            <p><strong>Grand Total:</strong> ₹${quotation.grand_total}</p>
+            <br/>
+            <p>Thank you for doing business with us!</p>
+          `,
+        });
+
+        res.json({ message: "Email sent successfully" });
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Failed to send email" });
+      }
+    }
+  );
+});
+
 module.exports = router;

@@ -19,7 +19,7 @@ const UserSidebar  = () => {
 
   const menu = [
     { icon: <Home size={20} />, title: "Dashboard",path: "/dashboard" },
-    { icon: <Users size={20} />, title: "Customers", subitems: ["Clients", "Client Users"] },
+    { icon: <Users size={20} />, title: "Customers", subitems: [{label: "Clients", path: "/dashboard/clients"}, {label: "Client Users", path: "/dashboard/client-users"}] },
      { icon: <ListTodo size={20} />, title: "Tasks", label:"Task", path:"/dashboard/task" },
      { icon: <Phone size={20} />, title: "Leads", 
       subitems:[
@@ -30,8 +30,7 @@ const UserSidebar  = () => {
     },
   
     { icon: <FileText size={20} />, title: "Proposals",path:"/dashboard/proposal"},
-    { icon: <Headphones size={20} />, title: "Support" ,subitems:[{label: "Chat", path:"/dashboard/chat"}] },
-    { icon: <Users2 size={20} />, title: "Team",subitems:["Team Members","Time Sheets" ] },
+    { icon: <Users2 size={20} />, title: "Team",subitems:[{label: "Team Member", path:"/dashboard/team"},"Time Sheets" ] },
     { icon: <BarChart2 size={20} />, title: "Reports" }
   ];
 

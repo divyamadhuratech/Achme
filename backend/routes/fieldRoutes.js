@@ -58,6 +58,7 @@ router.put("/:id", (req, res) => {
     reminder_required,
     reminder_date,
     reminder_notes,
+    reference,
   } = req.body;
 
   db.query(
@@ -74,7 +75,8 @@ router.put("/:id", (req, res) => {
       followup_notes=?,
       reminder_required=?,
       reminder_date=?,
-      reminder_notes=?
+      reminder_notes=?,
+      reference=?
      WHERE id=?`,
     [
       customer_name,
@@ -90,6 +92,7 @@ router.put("/:id", (req, res) => {
       reminder_required,
       reminder_date,
       reminder_notes,
+      reference,
       req.params.id,
     ],
     (err, result) => {
