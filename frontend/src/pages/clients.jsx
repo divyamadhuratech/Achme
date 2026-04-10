@@ -144,15 +144,6 @@ const Clients = () => {
           />
         </div>
 
-        {/* Top-Right Icons */}
-        <div className="flex items-center gap-3">
-          <div className="flex gap-2">
-            <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">📁</div>
-            <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">👤</div>
-            <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">📊</div>
-          </div>
-        </div>
-
         {/* Floating Add Button */}
         <button
           onClick={tabopen}

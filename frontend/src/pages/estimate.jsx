@@ -27,6 +27,7 @@ const Estimate = () => {
   const [category, setCategory] = useState("Default");
 
   const [Estimate, setEstimate] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const [isEdit, setIsEdit] = useState(false);
   const [selectedEstimateId, setSelectedEstimateId] = useState(null);
@@ -202,32 +203,11 @@ useEffect(() => {
             <Search size={18} className="text-gray-500" />
             <input
               type="text"
-              placeholder="Search"
+              placeholder="Search by company name"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
               className="Search outline-none text-sm w-full bg-gray-100"
             />
-          </div>
-
-          <div className="flex items-center gap-3 mt-2">
-            <div className="flex gap-2">
-              <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">
-                📁
-              </div>
-              <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">
-                👤
-              </div>
-              <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">
-                📊
-              </div>
-              <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">
-                ⬆️
-              </div>
-              <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">
-                🔽
-              </div>
-              <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">
-                ⚙️
-              </div>
-            </div>
           </div>
 
           <div className="mt-2">
@@ -464,7 +444,7 @@ useEffect(() => {
       </td>
     </tr>
   ) : (
-    Estimate.map((E) => (
+    Estimate.filter(E => E.client_company?.toLowerCase().includes(searchTerm.toLowerCase())).map((E) => (
       <tr key={E.id} className="border-b hover:bg-gray-50 text-sm">
 
           <td className="p-4">

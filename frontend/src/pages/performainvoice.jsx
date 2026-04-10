@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Plus, Search, Download, X, Edit2, MinusCircle, PlusCircle, Trash2, Send } from "lucide-react";
+import { Plus, Search, Download, X, Edit2, MinusCircle, PlusCircle, Trash2, Mail } from "lucide-react";
 import Invoice from "../components/invoicetemplate";
 import { calculateItemTotal, calculateTotals } from "../utils/invoicecal";
 import axios from "axios";
@@ -15,7 +15,12 @@ const PerformaInvoice = () => {
   const [showinvoice, setShowInvoice] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Description raw input for comma-split
+  // Mail modal
+  const [mailOpen, setMailOpen] = useState(false);
+  const [mailTo, setMailTo] = useState("");
+  const [mailSubject, setMailSubject] = useState("");
+  const [mailSending, setMailSending] = useState(false);
+
   const [descInput, setDescInput] = useState("");
 
   const [items, setItems] = useState([
@@ -31,6 +36,12 @@ const PerformaInvoice = () => {
   });
 
   const invoiceRef = useRef(null);
+
+  // Format PI number: PI-YYYY-NNN
+  const formatPINumber = (id, dateStr) => {
+    const year = dateStr ? new Date(dateStr).getFullYear() : new Date().getFullYear();
+    return `PI-${year}-${String(id).padStart(3, "0")}`;
+  };
 
   const downloadPDF = () => {
     if (!invoiceRef.current) return;
@@ -181,15 +192,31 @@ const PerformaInvoice = () => {
     } catch (error) { console.error(error); }
   };
 
-  const handleSendEmail = async () => {
+  // Open mail modal with auto-filled email
+  const openMailModal = () => {
     if (!selectedId) return alert("Select an invoice to send");
-    if (!window.confirm("Send this Performa Invoice via email?")) return;
+    const inv = performaInvoices.find(p => p.id === selectedId);
+    const email = inv?.email || "";
+    setMailTo(email);
+    setMailSubject(`Proforma Invoice ${formatPINumber(selectedId, inv?.invoice_date)}`);
+    setMailOpen(true);
+  };
+
+  const handleSendEmail = async () => {
+    if (!mailTo) return alert("Please enter recipient email");
+    setMailSending(true);
     try {
-      await axios.post(`http://localhost:3000/api/performainvoice/send-email/${selectedId}`);
+      await axios.post(`http://localhost:3000/api/performainvoice/send-email/${selectedId}`, {
+        to: mailTo,
+        subject: mailSubject,
+      });
       alert("Email sent successfully");
+      setMailOpen(false);
     } catch (error) {
       console.error(error);
       alert(error.response?.data?.message || "Failed to send email");
+    } finally {
+      setMailSending(false);
     }
   };
 
@@ -230,9 +257,9 @@ const PerformaInvoice = () => {
   const formatDate = (date) => date ? new Date(date).toLocaleString("en-IN", { dateStyle: "medium" }) : "---";
 
   useEffect(() => {
-    document.body.classList.toggle("modal-open", open);
+    document.body.classList.toggle("modal-open", open || mailOpen);
     return () => document.body.classList.remove("modal-open");
-  }, [open]);
+  }, [open, mailOpen]);
 
   const filteredInvoices = performaInvoices.filter(q =>
     q.customer_name?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -240,13 +267,13 @@ const PerformaInvoice = () => {
 
   return (
     <div className="w-full">
-      <div className="invoice-heading-tab flex gap-4 justify-between items-center">
+      <div className="invoice-heading-tab flex gap-4 justify-between items-center flex-wrap">
         <div>
           <h2 className="text-2xl font-bold text-[#1694CE]">Proforma Invoice</h2>
           <nav className="text-sm text-gray-500">Dashboard &gt; Finance &gt; Proforma Invoice</nav>
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
           <div className="flex items-center gap-3 bg-gray-100 px-3 py-1 rounded-lg border h-10 mt-2">
             <Search size={18} className="text-gray-500" />
             <input
@@ -262,8 +289,8 @@ const PerformaInvoice = () => {
             <button onClick={downloadPDF} title="Download PDF" className="w-10 h-10 bg-white border rounded-lg shadow-sm flex justify-center items-center hover:bg-gray-50 transition">
               <Download size={20} />
             </button>
-            <button onClick={handleSendEmail} title="Send Email" className="w-10 h-10 bg-white border rounded-lg shadow-sm flex justify-center items-center hover:bg-gray-50 transition">
-              <Send size={18} />
+            <button onClick={openMailModal} title="Send Email" className="w-10 h-10 bg-white border rounded-lg shadow-sm flex justify-center items-center hover:bg-gray-50 transition">
+              <Mail size={18} />
             </button>
             <button onClick={() => { if (!selectedId) return alert("Select an item"); handleEdit(selectedId); }} title="Edit" className="w-10 h-10 bg-white border rounded-lg shadow-sm flex justify-center items-center hover:bg-gray-50 transition">
               <Edit2 size={18} />
@@ -282,12 +309,13 @@ const PerformaInvoice = () => {
       </div>
 
       {!viewId && (
-        <div className="bg-white shadow-sm rounded-xl mt-6 overflow-hidden border border-gray-100">
-          <table className="w-full text-sm text-center border-collapse">
+        <div className="bg-white shadow-sm rounded-xl mt-6 overflow-hidden border border-gray-100 overflow-x-auto">
+          <table className="w-full text-sm text-center border-collapse min-w-[600px]">
             <thead className="bg-[#f8fafc]">
               <tr className="text-gray-700 font-bold uppercase text-xs border-b border-gray-200">
-                <th className="px-4 py-4 border-r">ID</th>
+                <th className="px-4 py-4 border-r">PI Number</th>
                 <th className="px-4 py-4 border-r">Customer Name</th>
+                <th className="px-4 py-4 border-r">Email</th>
                 <th className="px-4 py-4 border-r">Mobile</th>
                 <th className="px-4 py-4 border-r">Date</th>
                 <th className="px-4 py-4 border-r">Total</th>
@@ -301,8 +329,9 @@ const PerformaInvoice = () => {
                   onDoubleClick={() => { setViewId(p.id); setTimeout(() => setShowInvoice(true), 50); }}
                   className={`cursor-pointer border-b hover:bg-gray-50 transition ${selectedId === p.id ? "bg-blue-50/50" : ""}`}
                 >
-                  <td className="px-4 py-4 border-r font-medium text-blue-600">#{p.id}</td>
+                  <td className="px-4 py-4 border-r font-medium text-blue-600">{formatPINumber(p.id, p.invoice_date)}</td>
                   <td className="px-4 py-4 border-r">{p.customer_name}</td>
+                  <td className="px-4 py-4 border-r text-gray-500">{p.email || "---"}</td>
                   <td className="px-4 py-4 border-r">{p.mobile_number}</td>
                   <td className="px-4 py-4 border-r">{formatDate(p.invoice_date)}</td>
                   <td className="px-4 py-4 border-r font-bold text-gray-900">₹{p.grand_total?.toLocaleString()}</td>
@@ -310,7 +339,7 @@ const PerformaInvoice = () => {
                 </tr>
               ))}
               {filteredInvoices.length === 0 && (
-                <tr><td colSpan="6" className="py-10 text-gray-400 italic">No invoices found</td></tr>
+                <tr><td colSpan="7" className="py-10 text-gray-400 italic">No invoices found</td></tr>
               )}
             </tbody>
           </table>
@@ -318,6 +347,7 @@ const PerformaInvoice = () => {
         </div>
       )}
 
+      {/* Create/Edit Form Modal */}
       <div className={`overlay ${open ? "show" : ""} flex justify-center items-start overflow-y-auto pt-10 pb-10`}>
         <div className="bg-white rounded-xl shadow-2xl w-[90%] max-w-4xl p-8 relative">
           <div className="flex justify-between items-center mb-6">
@@ -334,7 +364,7 @@ const PerformaInvoice = () => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-bold text-gray-500 uppercase">Customer Name</label>
@@ -351,6 +381,10 @@ const PerformaInvoice = () => {
                   <input type="email" value={customer.email} onChange={e => setCustomer({ ...customer, email: e.target.value })} className="border rounded-lg px-4 py-2 outline-none" />
                 </div>
                 <div className="flex flex-col gap-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Location / City</label>
+                  <input type="text" value={customer.location_city} onChange={e => setCustomer({ ...customer, location_city: e.target.value })} className="border rounded-lg px-4 py-2 outline-none" />
+                </div>
+                <div className="flex flex-col gap-1">
                   <label className="text-xs font-bold text-gray-500 uppercase">Invoice Date</label>
                   <input type="date" value={performaInvoice.invoice_date} onChange={e => setPerformaInvoice({ ...performaInvoice, invoice_date: e.target.value })} className="border rounded-lg px-4 py-2 outline-none" required />
                 </div>
@@ -365,11 +399,11 @@ const PerformaInvoice = () => {
                 placeholder="e.g. Service A, Service B, Product C"
                 className="border rounded-lg px-4 py-2 outline-none min-h-[80px]"
               />
-              <p className="text-[10px] text-orange-500 italic mt-1 font-medium italic">Use commas (,) to split items automatically</p>
+              <p className="text-[10px] text-orange-500 italic mt-1 font-medium">Use commas (,) to split items automatically</p>
             </div>
 
-            <div className="border rounded-xl overflow-hidden shadow-sm">
-              <table className="w-full text-center text-sm">
+            <div className="border rounded-xl overflow-hidden shadow-sm overflow-x-auto">
+              <table className="w-full text-center text-sm min-w-[500px]">
                 <thead className="bg-gray-50 border-b">
                   <tr className="text-gray-600 font-bold uppercase text-[10px]">
                     <th className="px-4 py-3 text-left">Description</th>
@@ -424,9 +458,54 @@ const PerformaInvoice = () => {
         </div>
       </div>
 
+      {/* Mail Modal */}
+      <div className={`overlay ${mailOpen ? "show" : ""} flex justify-center items-center`}>
+        <div className="bg-white rounded-xl shadow-2xl w-[90%] max-w-lg p-8 relative">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Mail size={20} /> Send Proforma Invoice</h2>
+            <X className="cursor-pointer text-gray-400 hover:text-red-500" onClick={() => setMailOpen(false)} />
+          </div>
+          <div className="space-y-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-gray-500 uppercase">To (Email)</label>
+              <input
+                type="email"
+                value={mailTo}
+                onChange={e => setMailTo(e.target.value)}
+                className="border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-100"
+                placeholder="recipient@email.com"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-gray-500 uppercase">Subject</label>
+              <input
+                type="text"
+                value={mailSubject}
+                onChange={e => setMailSubject(e.target.value)}
+                className="border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-100"
+              />
+            </div>
+            <p className="text-xs text-gray-400 italic">The full invoice document will be included in the email.</p>
+          </div>
+          <div className="flex gap-4 pt-6">
+            <button
+              onClick={handleSendEmail}
+              disabled={mailSending}
+              className="bg-blue-600 text-white px-8 py-2.5 rounded-lg hover:bg-blue-700 font-bold shadow transition disabled:opacity-60"
+            >
+              {mailSending ? "Sending..." : "Send Email"}
+            </button>
+            <button onClick={() => setMailOpen(false)} className="bg-gray-200 text-gray-600 px-8 py-2.5 rounded-lg hover:bg-gray-300 font-bold transition">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Invoice Preview */}
       {viewId && (
         <div key={viewId} ref={invoiceRef} className={`invoicewrapper w-full mt-6 bg-white shadow-xl p-6 relative overflow-y-auto ${showinvoice ? "See" : ""}`}>
-          <X className="absolute right-6 top-6 cursor-pointer text-gray-400 hover:text-red-500 z-10" onClick={() => { setShowInvoice(false); setTimeout(() => setViewId(null), 400); }} />
+          <div className="flex gap-3 absolute right-6 top-6 z-10">
+            <X className="cursor-pointer text-gray-400 hover:text-red-500 bg-white rounded-full p-1" onClick={() => { setShowInvoice(false); setTimeout(() => setViewId(null), 400); }} />
+          </div>
           <Invoice performaInvoiceId={viewId} />
         </div>
       )}

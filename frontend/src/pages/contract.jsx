@@ -25,6 +25,7 @@ const Contracts = () => {
   
 
   const [contracts, setcontracts] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const formatInvoiceId = (id) => `CO-${String(id).padStart(6, "0")}`;
 
@@ -177,32 +178,11 @@ const deletePayment = async (id) => {
             <Search size={18} className="text-gray-500" />
             <input
               type="text"
-              placeholder="Search"
+              placeholder="Search by company name"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
               className="Search outline-none text-sm w-full bg-gray-100"
             />
-          </div>
-
-          <div className="flex items-center gap-3 mt-2">
-            <div className="flex gap-2">
-              <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">
-                📁
-              </div>
-              <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">
-                👤
-              </div>
-              <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">
-                📊
-              </div>
-              <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">
-                ⬆️
-              </div>
-              <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">
-                🔽
-              </div>
-              <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">
-                ⚙️
-              </div>
-            </div>
           </div>
 
           <div className="mt-2">
@@ -396,7 +376,7 @@ const deletePayment = async (id) => {
       </td>
     </tr>
   ) : (
-    contracts.map((inv) => (
+    contracts.filter(inv => inv.client_company?.toLowerCase().includes(searchTerm.toLowerCase())).map((inv) => (
       <tr key={inv.id} className="hover:bg-gray-100 transition">
         <td className="border px-3 py-3 ">
           {formatInvoiceId(inv.id)}

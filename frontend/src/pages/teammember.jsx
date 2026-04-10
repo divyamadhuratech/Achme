@@ -6,8 +6,14 @@ import axios from "axios";
 const Team = () => {
   const [open, setOpen] = useState(false);
   const [roleOpen, setRoleOpen] = useState(false);
+  const [mailOpen, setMailOpen] = useState(false);
+  const [mailTo, setMailTo] = useState("");
+  const [mailSubject, setMailSubject] = useState("");
+  const [mailMessage, setMailMessage] = useState("");
+  const [mailName, setMailName] = useState("");
 
 const [team,setTeam] = useState([]);
+const [searchTerm, setSearchTerm] = useState("");
 const [isEdit, setIsEdit] = useState(false);
 const [editId, setEditId] = useState(null);
 
@@ -114,6 +120,21 @@ const resetForm = ()=>{
   }
 };
 
+const openMailModal = (member) => {
+  setMailTo(member.emp_email || "");
+  setMailName(member.first_name || "");
+  setMailSubject("Work Information");
+  setMailMessage(`Hello ${member.first_name},\n\n`);
+  setMailOpen(true);
+};
+
+const handleSendMail = () => {
+  if (!mailTo) return alert("No email address for this member");
+  const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(mailTo)}&su=${encodeURIComponent(mailSubject)}&body=${encodeURIComponent(mailMessage)}`;
+  window.open(gmailUrl, "_blank");
+  setMailOpen(false);
+};
+
 
   return (
     <div className="invoices-main-tab">
@@ -130,17 +151,11 @@ const resetForm = ()=>{
             <Search size={18} className="text-gray-500" />
             <input
               type="text"
-              placeholder="Search"
+              placeholder="Search by employee name"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
               className="Search outline-none text-sm w-full bg-gray-100"
             />
-          </div>
-
-          <div className="flex items-center gap-3 mt-2">
-            <div className="flex gap-2">
-              <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">📁</div>
-              <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">👤</div>
-              <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">📊</div>
-            </div>
           </div>
 
           <div className="mt-2">
@@ -262,7 +277,7 @@ const resetForm = ()=>{
       <td colSpan="7" className="text-center py-10 text-gray-400 italic">No members found</td>
     </tr>
   ) : (
-    team.map((E) => (
+    team.filter(E => `${E.first_name} ${E.last_name}`.toLowerCase().includes(searchTerm.toLowerCase())).map((E) => (
       <tr key={E.id} className="border-b hover:bg-gray-50 transition text-sm">
         <td className="p-4 border">{E.id}</td>
         <td className="p-4 border font-medium">{E.first_name} {E.last_name}</td>
@@ -278,9 +293,9 @@ const resetForm = ()=>{
               <button type="button" onClick={() => editTeam(E)} className="text-green-600 hover:text-green-800 transition" title="Edit">
                 <Edit size={18} />
                </button>
-               <a href={`https://mail.google.com/mail/?view=cm&fs=1&to=${E.emp_email}&su=${encodeURIComponent("Work Information")}&body=${encodeURIComponent(`Hello ${E.first_name}`)}`} target="_blank" rel="noopener noreferrer" className="text-yellow-600 hover:text-yellow-800 transition" title="Send Email">
+               <button type="button" onClick={() => openMailModal(E)} className="text-yellow-600 hover:text-yellow-800 transition" title="Send Email">
                 <Mail size={18} />
-               </a>
+               </button>
           </div>
         </td>
       </tr>
@@ -290,6 +305,38 @@ const resetForm = ()=>{
 </table>
 </div> 
       </div>
+
+      {/* Mail Modal */}
+      {mailOpen && (
+        <div className="overlay show flex justify-center items-center">
+          <div className="bg-white rounded-xl shadow-2xl w-[90%] max-w-lg p-8 relative">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Mail size={20} /> Send Email to {mailName}</h2>
+              <X className="cursor-pointer text-gray-400 hover:text-red-500" onClick={() => setMailOpen(false)} />
+            </div>
+            <div className="space-y-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-bold text-gray-500 uppercase">To (Email)</label>
+                <input type="email" value={mailTo} readOnly className="border rounded-lg px-4 py-2 outline-none bg-gray-50 text-gray-600" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-bold text-gray-500 uppercase">Subject</label>
+                <input type="text" value={mailSubject} onChange={e => setMailSubject(e.target.value)} className="border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-100" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-bold text-gray-500 uppercase">Message</label>
+                <textarea value={mailMessage} onChange={e => setMailMessage(e.target.value)} rows={5} className="border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-100 resize-none" />
+              </div>
+            </div>
+            <div className="flex gap-4 pt-6">
+              <button onClick={handleSendMail} className="bg-blue-600 text-white px-8 py-2.5 rounded-lg hover:bg-blue-700 font-bold shadow transition">
+                Open in Gmail
+              </button>
+              <button onClick={() => setMailOpen(false)} className="bg-gray-200 text-gray-600 px-8 py-2.5 rounded-lg hover:bg-gray-300 font-bold transition">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

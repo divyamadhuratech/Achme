@@ -56,6 +56,7 @@ const formatDate = (date) => {
 // 
 
   const [Telecalls, setTelecall] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
  
   // Fetch all data
 
@@ -180,26 +181,11 @@ useEffect(() => {
             <Search size={18} className="text-gray-500" />
             <input
               type="text"
-              placeholder="Search"
+              placeholder="Search by customer name"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
               className="Search outline-none text-sm w-full bg-gray-100"
             />
-          </div>
-
-          <div className="flex items-center gap-3 mt-2">
-            <div className="flex gap-2">
-              <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">
-                👤
-              </div>
-              <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">
-                ⬆️
-              </div>
-              <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">
-                🔽
-              </div>
-              <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">
-                ⚙️
-              </div>
-            </div>
           </div>
 
           <div className="mt-2">
@@ -475,7 +461,7 @@ useEffect(() => {
      </thead>
 
      <tbody className="text-sm font-[Times-New-Roman] text-center">
-       {Telecalls.map((T) => (
+       {Telecalls.filter(T => T.customer_name?.toLowerCase().includes(searchTerm.toLowerCase())).map((T) => (
          <tr
            key={T.id}
            className="hover:bg-gray-100 hover:text-black transition"

@@ -18,7 +18,7 @@ import "../Styles/tailwind.css"
 import { Link } from "react-router-dom";
 
 
-const Sidebar = () => {
+const Sidebar = ({ onNavigate }) => {
   const [openMenu, setOpenMenu] = useState(null);
 
   const menu = [
@@ -55,7 +55,7 @@ const Sidebar = () => {
     { icon: <Briefcase size={20} />, title: "Contracts",
      subitems:[{label:"Contracts", path:"/dashboard/contracts"}] },
     { icon: <Users2 size={20} />, title: "Team",subitems:[{label: "Team Member", path:"/dashboard/team"},"Time Sheets" ] },
-    { icon: <BarChart2 size={20} />, title: "Reports" }
+    { icon: <BarChart2 size={20} />, title: "Reports", path: "/dashboard/reports" }
   ];
 
   const toggleMenu = (i) => setOpenMenu(openMenu === i ? null : i);
@@ -70,6 +70,7 @@ const Sidebar = () => {
         {item.path ? (
           <Link
             to={item.path}
+            onClick={onNavigate}
             className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-primary-text hover:hover:text-blue-500"
           >
             <div className="flex items-center gap-3">
@@ -104,6 +105,7 @@ const Sidebar = () => {
                   <li key={j}>
                     <Link
                       to={s.path}
+                      onClick={onNavigate}
                       className="text-sm text-primary-text hover:text-blue-500 block submenu font-[Times-Roman] text-[16px]"
                     >
                       {s.label}

@@ -14,7 +14,7 @@ import "../Styles/tailwind.css"
 import { Link } from "react-router-dom";
 
 
-const UserSidebar  = () => {
+const UserSidebar  = ({ onNavigate }) => {
   const [openMenu, setOpenMenu] = useState(null);
 
   const menu = [
@@ -46,6 +46,7 @@ const UserSidebar  = () => {
         {item.path ? (
           <Link
             to={item.path}
+            onClick={onNavigate}
             className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100"
           >
             <div className="flex items-center gap-3">
@@ -80,6 +81,7 @@ const UserSidebar  = () => {
                   <li key={j}>
                     <Link
                       to={s.path}
+                      onClick={onNavigate}
                       className="text-sm text-gray-700 hover:text-black block submenu font-[Times-Roman] text-[16px]"
                     >
                       {s.label}

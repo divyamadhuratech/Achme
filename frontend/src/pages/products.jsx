@@ -216,15 +216,6 @@ function Products() {
           />
         </div>
 
-        {/* Top-Right Icons */}
-        <div className="flex items-center gap-3">
-          <div className="flex gap-2">
-            <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">📁</div>
-            <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">👤</div>
-            <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">📊</div>
-          </div>
-        </div>
-
         {/* Add Button */}
         <button
           onClick={() => { resetForm(); setShowModal(true); }}
@@ -488,4 +479,4 @@ function Products() {
   );
 }
 
-export default Products;
+export default Products;

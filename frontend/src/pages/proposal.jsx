@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Plus, Search, Download, X, Edit2, MinusCircle, PlusCircle, Trash2, Send } from "lucide-react";
+import { Plus, Search, Download, X, Edit2, MinusCircle, PlusCircle, Trash2, Mail } from "lucide-react";
 import Invoice from "../components/invoicetemplate";
 import { calculateItemTotal, calculateTotals } from "../utils/invoicecal";
 import axios from "axios";
@@ -14,6 +14,12 @@ const Proposal = () => {
   const [showinvoice, setShowInvoice] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
+  // Mail modal
+  const [mailOpen, setMailOpen] = useState(false);
+  const [mailTo, setMailTo] = useState("");
+  const [mailSubject, setMailSubject] = useState("");
+  const [mailSending, setMailSending] = useState(false);
+
   const [items, setItems] = useState([
     { name: "", price: 0, qty: 1, tax: 18, discount: 0 },
   ]);
@@ -27,6 +33,11 @@ const Proposal = () => {
   });
 
   const invoiceRef = useRef(null);
+
+  const formatQTNumber = (id, dateStr) => {
+    const year = dateStr ? new Date(dateStr).getFullYear() : new Date().getFullYear();
+    return `QT-${year}-${String(id).padStart(3, "0")}`;
+  };
 
   const downloadPDF = () => {
     if (!invoiceRef.current) return;
@@ -132,13 +143,30 @@ const Proposal = () => {
     } catch (error) { console.error(error); }
   };
 
-  const handleSendEmail = async () => {
+  const openMailModal = () => {
     if (!selectedId) return alert("Select a quotation to send");
-    if (!window.confirm("Send via email?")) return;
+    const q = quotations.find(x => x.id === selectedId);
+    setMailTo(q?.email || "");
+    setMailSubject(`Quotation ${formatQTNumber(selectedId, q?.quotation_date)}`);
+    setMailOpen(true);
+  };
+
+  const handleSendEmail = async () => {
+    if (!mailTo) return alert("Please enter recipient email");
+    setMailSending(true);
     try {
-      await axios.post(`http://localhost:3000/api/quotations/send-email/${selectedId}`);
+      await axios.post(`http://localhost:3000/api/quotations/send-email/${selectedId}`, {
+        to: mailTo,
+        subject: mailSubject,
+      });
       alert("Email sent successfully");
-    } catch (error) { console.error(error); alert("Failed to send email"); }
+      setMailOpen(false);
+    } catch (error) {
+      console.error(error);
+      alert(error.response?.data?.message || "Failed to send email");
+    } finally {
+      setMailSending(false);
+    }
   };
 
   const updateItem = (i, field, value) => {
@@ -152,9 +180,9 @@ const Proposal = () => {
   const formatDate = (date) => date ? new Date(date).toLocaleString("en-IN", { dateStyle: "medium" }) : "---";
 
   useEffect(() => {
-    document.body.classList.toggle("modal-open", open);
+    document.body.classList.toggle("modal-open", open || mailOpen);
     return () => document.body.classList.remove("modal-open");
-  }, [open]);
+  }, [open, mailOpen]);
 
   const filteredQuotations = quotations.filter(q =>
     q.customer_name?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -162,20 +190,20 @@ const Proposal = () => {
 
   return (
     <div className="w-full">
-      <div className="invoice-heading-tab flex gap-4 justify-between items-center">
+      <div className="invoice-heading-tab flex gap-4 justify-between items-center flex-wrap">
         <div>
           <h2 className="text-2xl font-bold text-[#1694CE]">Quotation</h2>
           <span className="text-sm text-gray-500">Dashboard &gt; Proposals</span>
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
           <div className="flex items-center gap-3 bg-gray-100 px-3 py-1 rounded-lg border h-10 mt-2">
             <Search size={18} className="text-gray-500" />
             <input type="text" placeholder="Search customer..." className="outline-none text-sm w-40 bg-transparent" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           </div>
           <div className="flex items-center gap-2 mt-2">
             <button onClick={downloadPDF} title="Download" className="w-10 h-10 bg-white border rounded-lg shadow-sm flex justify-center items-center hover:bg-gray-50 transition"><Download size={20} /></button>
-            <button onClick={handleSendEmail} title="Email" className="w-10 h-10 bg-white border rounded-lg shadow-sm flex justify-center items-center hover:bg-gray-50 transition"><Send size={18} /></button>
+            <button onClick={openMailModal} title="Email" className="w-10 h-10 bg-white border rounded-lg shadow-sm flex justify-center items-center hover:bg-gray-50 transition"><Mail size={18} /></button>
             <button onClick={() => { if (!selectedId) return alert("Select an item"); handleEdit(selectedId); }} title="Edit" className="w-10 h-10 bg-white border rounded-lg shadow-sm flex justify-center items-center hover:bg-gray-50 transition"><Edit2 size={18} /></button>
             <button onClick={handleDelete} title="Delete" className="w-10 h-10 bg-white border rounded-lg shadow-sm flex justify-center items-center hover:bg-gray-50 transition"><Trash2 size={18} className="text-red-500" /></button>
           </div>
@@ -186,12 +214,13 @@ const Proposal = () => {
       </div>
 
       {!viewId && (
-        <div className="bg-white shadow-sm rounded-xl mt-6 overflow-hidden border border-gray-100">
-          <table className="w-full text-sm text-center border-collapse">
+        <div className="bg-white shadow-sm rounded-xl mt-6 overflow-hidden border border-gray-100 overflow-x-auto">
+          <table className="w-full text-sm text-center border-collapse min-w-[600px]">
             <thead className="bg-[#f8fafc]">
               <tr className="text-gray-700 font-bold uppercase text-xs border-b border-gray-200">
-                <th className="px-4 py-4 border-r">ID</th>
+                <th className="px-4 py-4 border-r">QT Number</th>
                 <th className="px-4 py-4 border-r">Customer Name</th>
+                <th className="px-4 py-4 border-r">Email</th>
                 <th className="px-4 py-4 border-r">Mobile</th>
                 <th className="px-4 py-4 border-r">Date</th>
                 <th className="px-4 py-4 border-r">Total</th>
@@ -205,8 +234,9 @@ const Proposal = () => {
                   onDoubleClick={() => { setViewId(q.id); setTimeout(() => setShowInvoice(true), 50); }}
                   className={`cursor-pointer border-b hover:bg-gray-50 transition ${selectedId === q.id ? "bg-blue-50/50" : ""}`}
                 >
-                  <td className="px-4 py-4 border-r font-medium text-blue-600">#{q.id}</td>
+                  <td className="px-4 py-4 border-r font-medium text-blue-600">{formatQTNumber(q.id, q.quotation_date)}</td>
                   <td className="px-4 py-4 border-r">{q.customer_name}</td>
+                  <td className="px-4 py-4 border-r text-gray-500">{q.email || "---"}</td>
                   <td className="px-4 py-4 border-r">{q.mobile_number}</td>
                   <td className="px-4 py-4 border-r">{formatDate(q.quotation_date)}</td>
                   <td className="px-4 py-4 border-r font-bold text-gray-900">₹{q.grand_total?.toLocaleString()}</td>
@@ -219,6 +249,7 @@ const Proposal = () => {
         </div>
       )}
 
+      {/* Create/Edit Form Modal */}
       <div className={`overlay ${open ? "show" : ""} flex justify-center items-start overflow-y-auto pt-10 pb-10`}>
         <div className="bg-white rounded-xl shadow-2xl w-[95%] max-w-5xl p-8 relative">
           <div className="flex justify-between items-center mb-6 border-b pb-4">
@@ -227,7 +258,7 @@ const Proposal = () => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-4">
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-bold text-gray-500 uppercase">Customer Name*</label>
@@ -244,14 +275,18 @@ const Proposal = () => {
                   <input type="text" value={customer.location_city} onChange={e => setCustomer({ ...customer, location_city: e.target.value })} className="border rounded-lg px-4 py-2 outline-none bg-gray-50" />
                 </div>
                 <div className="flex flex-col gap-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Email Address</label>
+                  <input type="email" value={customer.email} onChange={e => setCustomer({ ...customer, email: e.target.value })} className="border rounded-lg px-4 py-2 outline-none bg-gray-50" />
+                </div>
+                <div className="flex flex-col gap-1">
                   <label className="text-xs font-bold text-gray-500 uppercase">Quotation Date*</label>
                   <input type="date" value={quotation.quotation_date} onChange={e => setQuotation({ ...quotation, quotation_date: e.target.value })} className="border rounded-lg px-4 py-2 outline-none bg-gray-50" required />
                 </div>
               </div>
             </div>
 
-            <div className="border rounded-xl overflow-hidden shadow-sm border-gray-200">
-              <table className="w-full text-center text-sm border-collapse">
+            <div className="border rounded-xl overflow-hidden shadow-sm border-gray-200 overflow-x-auto">
+              <table className="w-full text-center text-sm border-collapse min-w-[500px]">
                 <thead className="bg-[#f1f5f9] border-b border-gray-200 text-gray-700 font-bold uppercase text-[10px]">
                   <tr>
                     <th className="px-4 py-3 text-left w-[40%]">Product Description</th>
@@ -266,7 +301,7 @@ const Proposal = () => {
                   {items.map((item, i) => (
                     <tr key={i} className="border-b last:border-0 hover:bg-gray-50">
                       <td className="px-4 py-3">
-                        <textarea value={item.name} onChange={e => updateItem(i, "name", e.target.value)} rows={2} className="w-full outline-none bg-transparent resize-none focus:bg-white p-1 rounded" placeholder="Product name, specs... (use commas for line breaks)" />
+                        <textarea value={item.name} onChange={e => updateItem(i, "name", e.target.value)} rows={2} className="w-full outline-none bg-transparent resize-none focus:bg-white p-1 rounded" placeholder="Product name, specs..." />
                       </td>
                       <td className="px-4 py-3"><input type="number" value={item.price} onChange={e => updateItem(i, "price", Number(e.target.value))} className="w-24 text-center outline-none bg-transparent focus:bg-white p-1 rounded border border-transparent focus:border-gray-200" /></td>
                       <td className="px-4 py-3"><input type="number" value={item.qty} onChange={e => updateItem(i, "qty", Number(e.target.value))} className="w-16 text-center outline-none bg-transparent focus:bg-white p-1 rounded border border-transparent focus:border-gray-200" /></td>
@@ -306,9 +341,39 @@ const Proposal = () => {
         </div>
       </div>
 
+      {/* Mail Modal */}
+      <div className={`overlay ${mailOpen ? "show" : ""} flex justify-center items-center`}>
+        <div className="bg-white rounded-xl shadow-2xl w-[90%] max-w-lg p-8 relative">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Mail size={20} /> Send Quotation</h2>
+            <X className="cursor-pointer text-gray-400 hover:text-red-500" onClick={() => setMailOpen(false)} />
+          </div>
+          <div className="space-y-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-gray-500 uppercase">To (Email)</label>
+              <input type="email" value={mailTo} onChange={e => setMailTo(e.target.value)} className="border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-100" placeholder="recipient@email.com" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-gray-500 uppercase">Subject</label>
+              <input type="text" value={mailSubject} onChange={e => setMailSubject(e.target.value)} className="border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-100" />
+            </div>
+            <p className="text-xs text-gray-400 italic">The full quotation document will be included in the email.</p>
+          </div>
+          <div className="flex gap-4 pt-6">
+            <button onClick={handleSendEmail} disabled={mailSending} className="bg-[#1694CE] text-white px-8 py-2.5 rounded-lg hover:bg-[#1279a8] font-bold shadow transition disabled:opacity-60">
+              {mailSending ? "Sending..." : "Send Email"}
+            </button>
+            <button onClick={() => setMailOpen(false)} className="bg-gray-200 text-gray-600 px-8 py-2.5 rounded-lg hover:bg-gray-300 font-bold transition">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Invoice Preview */}
       {viewId && (
         <div key={viewId} ref={invoiceRef} className={`invoicewrapper w-full mt-10 bg-white shadow-2xl p-8 relative overflow-y-auto ${showinvoice ? "See" : ""}`}>
-          <X className="absolute right-8 top-8 cursor-pointer text-gray-400 hover:text-red-500 z-50 bg-white rounded-full p-1" onClick={() => { setShowInvoice(false); setTimeout(() => setViewId(null), 400); }} />
+          <div className="flex gap-3 absolute right-8 top-8 z-50">
+            <X className="cursor-pointer text-gray-400 hover:text-red-500 bg-white rounded-full p-1" onClick={() => { setShowInvoice(false); setTimeout(() => setViewId(null), 400); }} />
+          </div>
           <Invoice quotationId={viewId} />
         </div>
       )}

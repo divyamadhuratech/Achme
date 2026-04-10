@@ -156,29 +156,6 @@ const deletePayment = async (id) => {
             />
           </div>
 
-          <div className="flex items-center gap-3 mt-2">
-            <div className="flex gap-2">
-              <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">
-                📁
-              </div>
-              <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">
-                👤
-              </div>
-              <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">
-                📊
-              </div>
-              <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">
-                ⬆️
-              </div>
-              <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">
-                🔽
-              </div>
-              <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">
-                ⚙️
-              </div>
-            </div>
-          </div>
-
           <div className="mt-2">
             <button
               onClick={() => tabopen(true)}

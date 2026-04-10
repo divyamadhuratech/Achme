@@ -37,6 +37,7 @@ const Fields = () =>{
 
 // fetch all data;
  const [fields, setFields] = useState([]);
+ const [searchTerm, setSearchTerm] = useState("");
 
 const fetchFields = async () => {
   const res = await axios.get("http://localhost:3000/api/fields");
@@ -175,26 +176,11 @@ useEffect(() => {
             <Search size={18} className="text-gray-500" />
             <input
               type="text"
-              placeholder="Search"
+              placeholder="Search by customer name"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
               className="Search outline-none text-sm w-full bg-gray-100"
             />
-          </div>
-
-          <div className="flex items-center gap-3 mt-2">
-            <div className="flex gap-2">
-              <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">
-                👤
-              </div>
-              <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">
-                ⬆️
-              </div>
-              <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">
-                🔽
-              </div>
-              <div className="w-9 h-9 bg-white border rounded-lg shadow flex justify-center items-center cursor-pointer">
-                ⚙️
-              </div>
-            </div>
           </div>
 
           <div className="mt-2">
@@ -473,7 +459,7 @@ useEffect(() => {
                    </tr>
                </thead>
                  <tbody className=" text-sm font-[Times-New-Roman] text-center">
-                  {fields.map((f) =>(
+                  {fields.filter(f => f.customer_name?.toLowerCase().includes(searchTerm.toLowerCase())).map((f) =>(
 
                    <tr key={f.id} className="border-b border-gray-200 hover:bg-gray-50 transition cursor-pointer">
                     <td className="px-4 py-3 border">{f.id}</td>

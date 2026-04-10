@@ -13,6 +13,7 @@ router.get("/", (req, res) => {
       c.customer_name,
       c.mobile_number,
       c.location_city,
+      c.email,
       MIN(qi.description) AS description
     FROM quotations q
     JOIN customers c ON c.id = q.customer_id
@@ -341,53 +342,75 @@ router.delete("/:id", (req, res) => {
 
 
 const nodemailer = require("nodemailer");
+const { generateInvoicePdf } = require("../backendutil/generateInvoicePdf");
 
 router.post("/send-email/:id", (req, res) => {
   const { id } = req.params;
+  const { to, subject } = req.body;
 
-  db.query(
-    `SELECT q.*, c.email, c.customer_name 
-     FROM quotations q 
-     JOIN customers c ON q.customer_id = c.id 
-     WHERE q.id = ?`,
-    [id],
-    async (err, rows) => {
+  const headerSql = `
+    SELECT q.*, c.email, c.customer_name, c.mobile_number, c.location_city,
+           q.grand_total, q.quotation_date, q.subtotal, q.total_cgst, q.total_sgst, q.total_discount
+    FROM quotations q
+    JOIN customers c ON q.customer_id = c.id
+    WHERE q.id = ?`;
+
+  const itemsSql = `
+    SELECT product_number, description, price, quantity, subtotal
+    FROM quotation_items WHERE quotation_id = ? ORDER BY product_number`;
+
+  db.query(headerSql, [id], (err, headerRows) => {
+    if (err) return res.status(500).json(err);
+    if (!headerRows.length) return res.status(404).json({ message: "Quotation not found" });
+
+    const quotation = headerRows[0];
+    // normalize field name so generateInvoicePdf can use invoice_date
+    quotation.invoice_date = quotation.quotation_date;
+
+    const recipientEmail = to || quotation.email;
+    if (!recipientEmail) return res.status(400).json({ message: "No email address provided" });
+
+    db.query(itemsSql, [id], async (err, items) => {
       if (err) return res.status(500).json(err);
-      if (!rows.length) return res.status(404).json({ message: "Quotation not found" });
 
-      const quotation = rows[0];
-      if (!quotation.email) return res.status(400).json({ message: "Customer has no email" });
+      const year = new Date(quotation.quotation_date).getFullYear();
+      const qtNumber = `QT-${year}-${String(quotation.id).padStart(3, "0")}`;
 
       try {
+        // Generate PDF with exact same design as the app
+        const pdfBuffer = await generateInvoicePdf({ invoice: quotation, items, type: "quotation" });
+
         const transporter = nodemailer.createTransport({
           service: "gmail",
-          auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS,
-          },
+          auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
         });
 
         await transporter.sendMail({
-          from: `"Sales Team" <${process.env.EMAIL_USER}>`,
-          to: quotation.email,
-          subject: `Proposal/Quotation #${quotation.id}`,
-          html: `
-            <h2>Hello ${quotation.customer_name},</h2>
-            <p>Please find the details of your quotation below:</p>
-            <p><strong>Quotation Date:</strong> ${new Date(quotation.quotation_date).toLocaleDateString()}</p>
-            <p><strong>Grand Total:</strong> ₹${quotation.grand_total}</p>
-            <br/>
-            <p>Thank you for doing business with us!</p>
-          `,
+          from: `"Madhura Team" <${process.env.EMAIL_USER}>`,
+          to: recipientEmail,
+          subject: subject || `Quotation ${qtNumber}`,
+          html: `<div style="font-family:Arial,sans-serif;padding:24px;max-width:600px;margin:0 auto;">
+            <p style="font-size:16px;color:#1e293b;">Dear Customer,</p>
+            <p style="font-size:14px;color:#374151;margin-top:12px;">Please find your <strong>Quotation ${qtNumber}</strong> attached to this email.</p>
+            <p style="font-size:14px;color:#374151;margin-top:8px;">Thank you for your business.</p>
+            <p style="font-size:14px;color:#374151;margin-top:16px;">Regards,<br/><strong>Madhura Technologies</strong></p>
+          </div>`,
+          attachments: [
+            {
+              filename: `Quotation_${qtNumber}.pdf`,
+              content: pdfBuffer,
+              contentType: "application/pdf",
+            },
+          ],
         });
 
         res.json({ message: "Email sent successfully" });
       } catch (err) {
         console.error(err);
-        res.status(500).json({ message: "Failed to send email" });
+        res.status(500).json({ message: "Failed to send email", error: err.message });
       }
-    }
-  );
+    });
+  });
 });
 
 module.exports = router;

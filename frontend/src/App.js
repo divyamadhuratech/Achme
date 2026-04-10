@@ -27,6 +27,7 @@ import Products from "./pages/products";
 import FollowupList from "./components/followuplist";
 import Clients from "./pages/clients";
 import PerformaInvoice from "./pages/performainvoice";
+import Reports from "./pages/reports";
 
 export default function App() {
   return (
@@ -56,6 +57,7 @@ export default function App() {
            <Route path="followupslist" element={<FollowupList />} />
            <Route path="clients" element={<Clients />} />
            <Route path="performainvoice" element={<PerformaInvoice />} />
+           <Route path="reports" element={<Reports />} />
            
           </Route>
         </Routes>
