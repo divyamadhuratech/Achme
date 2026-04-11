@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from "react";
 import "../Styles/tailwind.css";
-import { Search, Plus, X, Edit2, Trash2, Eye } from "lucide-react";
+import { Search, Plus, X, Edit2, Trash2 } from "lucide-react";
 import axios from "axios";
 
 const Invoice = () => {
   const [open, setOpen] = useState(false);
-  const [viewInv, setViewInv] = useState(null);
   const [editId, setEditId] = useState(null);
 
   const [clientSearch, setClientSearch] = useState("");
@@ -13,9 +12,9 @@ const Invoice = () => {
   const [clientType, setClientType] = useState("existing");
 
   const [companyName, setCompanyName] = useState("");
-  const [firstname, setFirstname] = useState("");
-  const [lastname, setLastname] = useState("");
-  const [email, setEmail] = useState("");
+  const [clientForm, setClientForm] = useState({
+    name: "", company_name: "", email: "", phone: "", address: "", state: "", pincode: "",
+  });
 
   const [projectNames, setProjectname] = useState("");
   const [invoiceDate, setInvoiceDate] = useState("");
@@ -28,6 +27,8 @@ const Invoice = () => {
   const formatInvoiceId = (id) => `INV-${String(id).padStart(6, "0")}`;
   const formatDate = (date) => date ? new Date(date).toLocaleDateString("en-IN") : "---";
 
+  const [clientSaved, setClientSaved] = useState(false);
+
   const fetchInvoices = async () => {
     try {
       const res = await axios.get("http://localhost:3000/api/invoice/with-payments");
@@ -39,9 +40,9 @@ const Invoice = () => {
 
   const resetForm = () => {
     setClientSearch(""); setClientList([]); setClientType("existing");
-    setCompanyName(""); setFirstname(""); setLastname(""); setEmail("");
+    setClientForm({ name: "", company_name: "", email: "", phone: "", address: "", state: "", pincode: "" });
     setProjectname(""); setInvoiceDate(""); setInvoiceDueDate(""); setCategory("Default");
-    setEditId(null); setOpen(false);
+    setEditId(null); setClientSaved(false); setOpen(false);
   };
 
   const openEdit = async (inv) => {
@@ -69,19 +70,26 @@ const Invoice = () => {
     setClientList([]);
   };
 
+  // Save new client only (step 1 when clientType === "new")
+  const saveNewClient = async () => {
+    if (!clientForm.name || !clientForm.email) {
+      return alert("Name and Email are required");
+    }
+    try {
+      await axios.post("http://localhost:3000/api/client", clientForm);
+      // Auto-select the saved company name
+      setClientSearch(clientForm.company_name || clientForm.name);
+      setClientType("existing");
+      setClientSaved(true);
+      alert(`Client "${clientForm.company_name || clientForm.name}" saved! Now fill in the invoice details and submit.`);
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to save client");
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      if (clientType === "new") {
-        if (!companyName || !firstname || !lastname || !email) return alert("Please fill all client details");
-        await axios.post("http://localhost:3000/api/client/new", {
-          company_name: companyName, client_firstname: firstname,
-          client_lastname: lastname, client_email: email,
-        });
-        alert("Client created successfully");
-        resetForm(); return;
-      }
-
       if (editId) {
         await axios.put(`http://localhost:3000/api/invoice/${editId}`, {
           client_company: clientSearch, project_names: projectNames,
@@ -89,6 +97,7 @@ const Invoice = () => {
         });
         alert("Invoice updated successfully");
       } else {
+        if (!clientSearch) return alert("Please select or add a client first");
         await axios.post("http://localhost:3000/api/invoice/new", {
           client_company: clientSearch, project_names: projectNames,
           invoice_date: invoiceDate, invoice_duedate: invoiceDueDate, category,
@@ -175,25 +184,82 @@ const Invoice = () => {
             </div>
 
             {clientType === "new" && (
-              <div className="bg-gray-100 p-6 rounded-lg space-y-4">
-                <div className="grid grid-cols-4 items-center gap-6">
-                  <label>Company Name<span className="text-red-500">*</span></label>
-                  <input value={companyName} onChange={e => setCompanyName(e.target.value)} className="col-span-3 border rounded-md px-3 py-2 outline-none" />
+              <div className="bg-gray-100 p-6 rounded-lg space-y-4 border border-blue-100">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-semibold text-blue-700">Step 1: Add New Client</p>
+                  {clientSaved && <span className="text-xs text-green-600 font-semibold bg-green-50 px-2 py-1 rounded">✓ Client saved</span>}
                 </div>
-                <div className="grid grid-cols-4 items-center gap-6">
-                  <label>First Name<span className="text-red-500">*</span></label>
-                  <input value={firstname} placeholder="e.g. Ravi" onKeyDown={e => { if (/[0-9]/.test(e.key)) e.preventDefault(); }}
-                    onChange={e => setFirstname(e.target.value)} className="col-span-3 border rounded-md px-3 py-2 outline-none" />
+
+                <div className="flex items-center gap-6">
+                  <label className="w-40 text-sm text-gray-700">Name <span className="text-red-500">*</span></label>
+                  <input type="text" value={clientForm.name}
+                    onChange={e => setClientForm({...clientForm, name: e.target.value})}
+                    onKeyDown={e => { if (/[0-9]/.test(e.key)) e.preventDefault(); }}
+                    placeholder="e.g. Ravi Kumar"
+                    className="flex-1 border rounded-lg px-3 py-2 outline-none bg-white" required />
                 </div>
-                <div className="grid grid-cols-4 items-center gap-6">
-                  <label>Last Name<span className="text-red-500">*</span></label>
-                  <input value={lastname} placeholder="e.g. Kumar" onKeyDown={e => { if (/[0-9]/.test(e.key)) e.preventDefault(); }}
-                    onChange={e => setLastname(e.target.value)} className="col-span-3 border rounded-md px-3 py-2 outline-none" />
+
+                <div className="flex items-center gap-6">
+                  <label className="w-40 text-sm text-gray-700">Company Name</label>
+                  <input type="text" value={clientForm.company_name}
+                    onChange={e => setClientForm({...clientForm, company_name: e.target.value})}
+                    placeholder="e.g. Madhura Technologies"
+                    className="flex-1 border rounded-lg px-3 py-2 outline-none bg-white" />
                 </div>
-                <div className="grid grid-cols-4 items-center gap-6">
-                  <label>Email<span className="text-red-500">*</span></label>
-                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="col-span-3 border rounded-md px-3 py-2 outline-none" />
+
+                <div className="flex items-center gap-6">
+                  <label className="w-40 text-sm text-gray-700">Email <span className="text-red-500">*</span></label>
+                  <input type="email" value={clientForm.email}
+                    onChange={e => setClientForm({...clientForm, email: e.target.value})}
+                    placeholder="e.g. ravi@example.com"
+                    className="flex-1 border rounded-lg px-3 py-2 outline-none bg-white" required />
                 </div>
+
+                <div className="flex items-center gap-6">
+                  <label className="w-40 text-sm text-gray-700">Phone</label>
+                  <input type="text" value={clientForm.phone}
+                    onChange={e => { if (/^\d{0,13}$/.test(e.target.value)) setClientForm({...clientForm, phone: e.target.value}); }}
+                    maxLength={13} inputMode="numeric" placeholder="e.g. 9876543210"
+                    className="flex-1 border rounded-lg px-3 py-2 outline-none bg-white" />
+                </div>
+
+                <div className="flex items-center gap-6">
+                  <label className="w-40 text-sm text-gray-700">Address</label>
+                  <input type="text" value={clientForm.address}
+                    onChange={e => setClientForm({...clientForm, address: e.target.value})}
+                    placeholder="e.g. 12 Main Street"
+                    className="flex-1 border rounded-lg px-3 py-2 outline-none bg-white" />
+                </div>
+
+                <div className="flex items-center gap-6">
+                  <label className="w-40 text-sm text-gray-700">State</label>
+                  <input type="text" value={clientForm.state}
+                    onChange={e => setClientForm({...clientForm, state: e.target.value})}
+                    placeholder="e.g. Tamil Nadu"
+                    className="flex-1 border rounded-lg px-3 py-2 outline-none bg-white" />
+                </div>
+
+                <div className="flex items-center gap-6">
+                  <label className="w-40 text-sm text-gray-700">Pincode</label>
+                  <input type="text" value={clientForm.pincode}
+                    onChange={e => { if (/^\d{0,6}$/.test(e.target.value)) setClientForm({...clientForm, pincode: e.target.value}); }}
+                    maxLength={6} inputMode="numeric" placeholder="e.g. 641001"
+                    className="flex-1 border rounded-lg px-3 py-2 outline-none bg-white" />
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button type="button" onClick={saveNewClient}
+                    className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 text-sm font-semibold">
+                    Save Client & Continue →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 2 label when client is saved */}
+            {clientSaved && (
+              <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-700 font-medium">
+                ✓ Client "<strong>{clientSearch}</strong>" selected. Now fill in the invoice details below.
               </div>
             )}
 
@@ -230,30 +296,6 @@ const Invoice = () => {
         </div>
       </div>
 
-      {/* View Modal */}
-      {viewInv && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
-          <div className="bg-white rounded-xl shadow-2xl w-[90%] max-w-lg p-8 relative">
-            <button onClick={() => setViewInv(null)} className="absolute top-4 right-4 text-gray-400 hover:text-red-500"><X /></button>
-            <h2 className="text-xl font-bold text-[#1694CE] mb-6">Invoice Details</h2>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between border-b pb-2"><span className="text-gray-500 font-medium">Invoice ID</span><span className="font-semibold">{formatInvoiceId(viewInv.id)}</span></div>
-              <div className="flex justify-between border-b pb-2"><span className="text-gray-500 font-medium">Company</span><span className="font-semibold">{viewInv.client_company}</span></div>
-              <div className="flex justify-between border-b pb-2"><span className="text-gray-500 font-medium">Project</span><span>{viewInv.project_names || "---"}</span></div>
-              <div className="flex justify-between border-b pb-2"><span className="text-gray-500 font-medium">Invoice Date</span><span>{formatDate(viewInv.invoice_date)}</span></div>
-              <div className="flex justify-between border-b pb-2"><span className="text-gray-500 font-medium">Due Date</span><span>{formatDate(viewInv.invoice_duedate)}</span></div>
-              <div className="flex justify-between border-b pb-2"><span className="text-gray-500 font-medium">Category</span><span>{viewInv.category || "Default"}</span></div>
-              <div className="flex justify-between border-b pb-2"><span className="text-gray-500 font-medium">Payments Received</span><span className="font-bold text-green-600">₹{Number(viewInv.paid_amount || 0).toFixed(2)}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500 font-medium">Status</span>
-                <span className={`px-3 py-1 rounded text-xs font-semibold ${viewInv.paid_amount > 0 ? "bg-green-100 text-green-600" : "bg-gray-100 text-gray-500"}`}>
-                  {viewInv.paid_amount > 0 ? "Partial" : "Draft"}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Table */}
       <div className="bg-white shadow rounded-xl overflow-x-auto mt-5">
         <table className="w-full text-sm border border-gray-300">
@@ -263,15 +305,12 @@ const Invoice = () => {
               <th className="border px-4 py-3">Invoice Date</th>
               <th className="border px-4 py-3">Company Name</th>
               <th className="border px-4 py-3">Project Title</th>
-              <th className="border px-4 py-3">Discount Amount</th>
-              <th className="border px-4 py-3">Payments</th>
-              <th className="border px-4 py-3">Status</th>
               <th className="border px-4 py-3 text-center">Actions</th>
             </tr>
           </thead>
           <tbody className="text-sm text-center">
             {filtered.length === 0 ? (
-              <tr><td colSpan="8" className="py-6 text-gray-400">No invoices found</td></tr>
+              <tr><td colSpan="5" className="py-6 text-gray-400">No invoices found</td></tr>
             ) : (
               filtered.map(inv => (
                 <tr key={inv.id} className="hover:bg-gray-50 transition border-b">
@@ -279,18 +318,8 @@ const Invoice = () => {
                   <td className="border px-4 py-2">{formatDate(inv.invoice_date)}</td>
                   <td className="border px-4 py-2">{inv.client_company}</td>
                   <td className="border px-4 py-2">{inv.project_names || "---"}</td>
-                  <td className="border px-4 py-2">---</td>
-                  <td className="border px-4 py-2">₹{Number(inv.paid_amount || 0).toFixed(2)}</td>
-                  <td className="border px-4 py-2">
-                    <span className={`px-3 py-1 rounded text-xs ${inv.paid_amount > 0 ? "bg-green-100 text-green-600" : "bg-gray-100 text-gray-500"}`}>
-                      {inv.paid_amount > 0 ? "Partial" : "Draft"}
-                    </span>
-                  </td>
                   <td className="border px-4 py-2">
                     <div className="flex items-center justify-center gap-3">
-                      <button onClick={() => setViewInv(inv)} title="View" className="text-blue-500 hover:text-blue-700 transition">
-                        <Eye size={16} />
-                      </button>
                       <button onClick={() => openEdit(inv)} title="Edit" className="text-green-600 hover:text-green-800 transition">
                         <Edit2 size={16} />
                       </button>
