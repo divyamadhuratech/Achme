@@ -8,11 +8,14 @@ import UserSidebar from "../sidebars/usersidebar";
 
 // Context to pass dashboard search query to the dashboard page
 export const DashboardSearchContext = createContext("");
+export const ReminderContext = createContext({ setReminderData: () => {}, setReminderNotes: () => {} });
 
 export default function DashboardLayout() {
   const { user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [reminderData, setReminderData] = useState(null);
+  const [reminderNotes, setReminderNotes] = useState(null);
   const location = useLocation();
 
   if (!user) return <Navigate to="/login" />;
@@ -21,12 +24,15 @@ export default function DashboardLayout() {
 
   return (
     <DashboardSearchContext.Provider value={searchQuery}>
+    <ReminderContext.Provider value={{ setReminderData, setReminderNotes }}>
       {/* TOPBAR */}
       <div className="fixed top-0 left-0 w-full z-50">
         <Topbar
           onHamburgerClick={() => setSidebarOpen(prev => !prev)}
           showSearch={isDashboard}
           onSearch={setSearchQuery}
+          reminderData={reminderData}
+          reminderNotes={reminderNotes}
         />
       </div>
 
@@ -58,6 +64,7 @@ export default function DashboardLayout() {
           <Outlet />
         </div>
       </div>
+    </ReminderContext.Provider>
     </DashboardSearchContext.Provider>
   );
 }

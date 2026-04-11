@@ -215,13 +215,13 @@ const formatDate = (date) => {
             <form action="" onSubmit={saveWalkins} className=" invoice-form p-6 space-y-6 relative">
                 <div className="grid grid-cols-4 items-center gap-6">
                    <label htmlFor="" className="text-sm text-gray-600 text-left">Customer Name</label>
-                   <input type="text" value={form.customer_name}  onChange={handleChange} name="customer_name"  className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
+                   <input type="text" value={form.customer_name}  onChange={handleChange} name="customer_name" placeholder="e.g. Ravi Kumar" onKeyDown={e => { if (/[0-9]/.test(e.key)) e.preventDefault(); }} className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
                 </div>
 
                 {/*  */}
                  <div className="grid grid-cols-4 items-center gap-6">
                    <label htmlFor="" className="text-sm text-gray-600 text-left">Mobile Number</label>
-                   <input type="text" value={form.mobile_number} onChange={handleChange} name="mobile_number" className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
+                   <input type="text" value={form.mobile_number} onChange={handleChange} name="mobile_number" maxLength={13} inputMode="numeric" onKeyDown={e => { if (!/[0-9]/.test(e.key) && !["Backspace","Delete","ArrowLeft","ArrowRight","Tab"].includes(e.key)) e.preventDefault(); }} className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
                 </div>
 
                 {/*  */}

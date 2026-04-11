@@ -14,6 +14,8 @@ const Payments = () =>{
   const [payment, setPayment] = useState([]);
   const [isEdit, setIsEdit] = useState(false);
   const [selectedPaymentId, setSelectedPaymentId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [errors, setErrors] = useState({});
 
   const formatDate = (date) =>
   new Date(date).toLocaleDateString("en-IN");
@@ -52,35 +54,50 @@ useEffect(() => {
   const savePayment = async (e) => {
   e.preventDefault();
 
+  // Frontend validation
+  const newErrors = {};
+  const invoiceIdNum = Number(form.invoice_id);
+  if (!form.invoice_id || isNaN(invoiceIdNum) || invoiceIdNum <= 0 || !Number.isInteger(invoiceIdNum)) {
+    newErrors.invoice_id = "Invoice ID must be a valid positive number (e.g. 1, 2, 3)";
+  }
+  if (!form.amount || isNaN(Number(form.amount)) || Number(form.amount) <= 0) {
+    newErrors.amount = "Amount must be a positive number";
+  }
+  if (!form.payment_method) {
+    newErrors.payment_method = "Please select a payment method";
+  }
+  if (form.Transaction_ID && !/^\d+$/.test(form.Transaction_ID)) {
+    newErrors.Transaction_ID = "Transaction ID must contain numbers only (e.g. 123456)";
+  }
+
+  if (Object.keys(newErrors).length > 0) {
+    setErrors(newErrors);
+    return;
+  }
+  setErrors({});
+
   const payload = {
-    invoice_id: Number(form.invoice_id),
+    invoice_id: invoiceIdNum,
     amount: Number(form.amount),
     payment_date: form.payment_date,
     payment_method: form.payment_method,
-    Transaction_ID: form.Transaction_ID || null,
+    Transaction_ID: form.Transaction_ID ? Number(form.Transaction_ID) : null,
     invoice_email: form.invoice_email ? 1 : 0,
   };
 
   try {
     if (isEdit) {
-      await axios.put(
-        `http://localhost:3000/api/payments/${selectedPaymentId}`,
-        payload
-      );
+      await axios.put(`http://localhost:3000/api/payments/${selectedPaymentId}`, payload);
       alert("Edited Successfully");
     } else {
-      await axios.post(
-        "http://localhost:3000/api/payments/new",
-        payload
-      );
+      await axios.post("http://localhost:3000/api/payments/new", payload);
       alert("Payments Created Successfully");
     }
-
     fetchPayment();
     resetForm(); 
   } catch (err) {
     console.error("SAVE ERROR:", err.response?.data || err);
-    alert("Payment save failed");
+    alert(err.response?.data?.message || "Payment save failed");
   }
 };
 
@@ -112,6 +129,7 @@ const resetForm = () => {
     Transaction_ID: "",
     invoice_email: false,
   });
+  setErrors({});
   setIsEdit(false);
   setSelectedPaymentId(null);
   setOpen(false);
@@ -151,7 +169,9 @@ const deletePayment = async (id) => {
             <Search size={18} className="text-gray-500" />
             <input
               type="text"
-              placeholder="Search"
+              placeholder="Search by Invoice ID..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
               className="Search outline-none text-sm w-full bg-gray-100"
             />
           </div>
@@ -171,11 +191,11 @@ const deletePayment = async (id) => {
          
 
        {/* Form */}
-         <div className="overflow-y-auto">
-          <div className={`overlay ${open ? "show" : ""} overflow-y-auto`}>
+         <div className="overflow-y-auto ">
+          <div className={`overlay ${open ? "show" : ""}  overflow-y-auto`}>
               <div className={`task-application bg-white shadow ml-[18%] w-[70%]  mb-[50px] overflow-y auto  p-5 rounded-lg  ${
               open ? "show" : ""}`}>
-                          <div className="flex justify-between items-center">
+                          <div className="mt-7 flex justify-between items-center">
                                <h2 className="text-2xl font-semibold mb-8 text-gray-700 mt-[-20px]">
                                  Add A New Payment
                                </h2>
@@ -185,28 +205,32 @@ const deletePayment = async (id) => {
                              </div>
 
                              {/*Forms  */}
-                         <div>
-                            <form onSubmit={savePayment} className="payment-form p-2 space-y-6 relative">
+                         <div >
+                            <form onSubmit={savePayment} className=" payment-form p-2 space-y-6 relative">
 
                          {/* Invoice ID */}
                          <div className="grid grid-cols-[180px_1fr] items-center gap-8">
                           <label className="text-sm text-gray-600 text-left">
                              Invoice ID <span className="text-red-500">*</span></label>
 
-                           <div className="flex w-full">
+                           <div className="flex flex-col w-full gap-1">
+                         <div className="flex w-full">
                          {/* PREFIX */}
                          <div className=" inv flex items-center w-[60px] px-2 bg-[#F5F5F5] border border-r-0 rounded-l-md  text-[#AAB1B5]">
                           <span>INV-</span>
                           </div>
-
                       {/* INPUT */}
                          <input
                           type="text"
                           value={form.invoice_id}
-                          onChange={handleChange}
+                          onChange={e => { if (/^\d*$/.test(e.target.value)) { setForm({...form, invoice_id: e.target.value}); setErrors({...errors, invoice_id: ""}); } }}
                           name="invoice_id"
-                         className=" border border-l-0 rounded-r-md px-3 py-2 outline-none w-full" />
+                          placeholder="e.g. 1"
+                          inputMode="numeric"
+                         className={`border border-l-0 rounded-r-md px-3 py-2 outline-none w-full ${errors.invoice_id ? "border-red-400" : ""}`} />
                       </div>
+                      {errors.invoice_id && <p className="text-red-500 text-xs mt-1">{errors.invoice_id}</p>}
+                  </div>
                   </div>
 
 
@@ -280,12 +304,22 @@ const deletePayment = async (id) => {
   {/* Transaction ID */}
              <div className="grid grid-cols-[180px_1fr] items-center gap-8">
             <label className="text-sm text-gray-600 text-left">Transaction ID</label>
-            <input type="text" onChange={handleChange} value={form.Transaction_ID} name="Transaction_ID" className="border rounded-md px-3 py-2 outline-none w-full" />
+            <div className="flex flex-col gap-1 w-full">
+              <input
+                type="text"
+                onChange={e => { if (/^\d*$/.test(e.target.value)) { setForm({...form, Transaction_ID: e.target.value}); setErrors({...errors, Transaction_ID: ""}); } }}
+                value={form.Transaction_ID}
+                name="Transaction_ID"
+                placeholder="Numbers only, e.g. 123456"
+                inputMode="numeric"
+                className={`border rounded-md px-3 py-2 outline-none w-full ${errors.Transaction_ID ? "border-red-400" : ""}`} />
+              {errors.Transaction_ID && <p className="text-red-500 text-xs">{errors.Transaction_ID}</p>}
+            </div>
             </div>
 
             {/* Send the email */}
 
-              <div className="Email flex items-start gap-2 text-left w-[50%] ml-[-54%]">
+              {/* <div className="Email flex items-start gap-2 text-left w-[50%] ml-[-54%]">
              <input
               type="checkbox"
               name="invoice_email"
@@ -295,7 +329,7 @@ const deletePayment = async (id) => {
               className="mt-1 shrink-0 w-[40px]"/>
               <label className="text-sm  text-gray-600 leading-5 w-[68%]">
               Send the client a payment received email</label>
-             </div>
+             </div> */}
 
 
               {/* submit / close */}
@@ -345,7 +379,12 @@ const deletePayment = async (id) => {
       </td>
     </tr>
   ) : (
-    payment.map((p) => (
+    payment.filter(p => {
+      if (!searchTerm) return true;
+      const formatted = `INV-${String(p.invoice_id).padStart(6, "0")}`;
+      return formatted.toLowerCase().includes(searchTerm.toLowerCase()) ||
+             String(p.invoice_id).includes(searchTerm);
+    }).map((p) => (
       <tr key={p.id} className="border-b text-sm hover:bg-gray-50">
         <td className="p-4 text-[#1694CE]">
           INV-{String(p.invoice_id).padStart(6, "0")}

@@ -392,15 +392,7 @@ useEffect(() => {
                 </select>
               </div>
 
-              <div className="flex justify-between items-center text-sm text-gray-600">
-                <span>Additional Information</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" />
-                  <div className="w-10 h-5 bg-gray-300 rounded-full peer peer-checked:bg-blue-500 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:h-4 after:w-4 after:rounded-full after:transition peer-checked:after:translate-x-5"></div>
-                </label>
-              </div>
-
-              <p className="text-xs text-gray-500">* Required</p>
+            
 
               <div className="flex gap-4 pt-4">
                 <button

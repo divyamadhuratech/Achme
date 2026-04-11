@@ -6,7 +6,7 @@ import { normalizeDate, getToday } from "../utils/leadutil";
 
 const Reports = () => {
   const navigate = useNavigate();
-  const [filter, setFilter] = useState("day"); // day | week | month
+  const [filter, setFilter] = useState("day"); // day | week | month | year
 
   const [telecalls, setTelecalls] = useState([]);
   const [walkins, setWalkins] = useState([]);
@@ -37,6 +37,9 @@ const Reports = () => {
       d.setDate(d.getDate() - 6);
     } else if (filter === "month") {
       d.setDate(1);
+    } else if (filter === "year") {
+      d.setMonth(0);
+      d.setDate(1);
     }
     return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
   };
@@ -65,7 +68,7 @@ const Reports = () => {
   const convertedWalkins = filteredWalkins.filter(w => w.walkin_status === "Converted").length;
   const convertedFields = filteredFields.filter(f => f.field_outcome === "Converted").length;
 
-  const filterLabel = { day: "Today", week: "This Week", month: "This Month" };
+  const filterLabel = { day: "Today", week: "This Week", month: "This Month", year: "This Year" };
 
   const MetricCard = ({ title, value, sub, color, onClick }) => (
     <div
@@ -93,8 +96,22 @@ const Reports = () => {
   const days = getDaysInRange();
 
   const formatDisplayDate = (dateStr) => {
-    return new Date(dateStr).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: filter === "month" ? "numeric" : undefined });
+    return new Date(dateStr).toLocaleDateString("en-IN", {
+      day: "2-digit", month: "short",
+      year: (filter === "month" || filter === "year") ? "numeric" : undefined
+    });
   };
+
+  // For yearly view, group by month instead of day-by-day
+  const getYearlyMonths = () => {
+    const year = new Date().getFullYear();
+    return Array.from({ length: 12 }, (_, i) => {
+      const m = String(i + 1).padStart(2, "0");
+      return `${year}-${m}`;
+    });
+  };
+
+  const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
   return (
     <div className="w-full p-4 md:p-8">
@@ -107,7 +124,7 @@ const Reports = () => {
 
         {/* Filter Tabs */}
         <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
-          {["day", "week", "month"].map(f => (
+          {["day", "week", "month", "year"].map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -117,7 +134,7 @@ const Reports = () => {
                   : "text-gray-500 hover:text-gray-700"
               }`}
             >
-              {f === "day" ? "Day" : f === "week" ? "Weekly" : "Monthly"}
+              {f === "day" ? "Day" : f === "week" ? "Weekly" : f === "month" ? "Monthly" : "Yearly"}
             </button>
           ))}
         </div>
@@ -160,13 +177,15 @@ const Reports = () => {
       {/* Detailed Table */}
       <div className="bg-shell text-shell-text rounded-xl shadow-lg overflow-hidden">
         <div className="p-6 border-b">
-          <h3 className="text-lg font-semibold">Day-wise Breakdown</h3>
+          <h3 className="text-lg font-semibold">
+            {filter === "year" ? "Month-wise Breakdown" : "Day-wise Breakdown"}
+          </h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-center border-collapse min-w-[600px]">
             <thead className="bg-gray-50 text-gray-600 font-bold uppercase text-xs">
               <tr>
-                <th className="px-4 py-3 border-b text-left">Date</th>
+                <th className="px-4 py-3 border-b text-left">{filter === "year" ? "Month" : "Date"}</th>
                 <th className="px-4 py-3 border-b">Sales (₹)</th>
                 <th className="px-4 py-3 border-b">Visitors</th>
                 <th className="px-4 py-3 border-b">Calls</th>
@@ -174,26 +193,43 @@ const Reports = () => {
               </tr>
             </thead>
             <tbody>
-              {days.map(day => {
-                const daySales = performaInvoices
-                  .filter(p => normalizeDate(p.invoice_date) === day)
-                  .reduce((sum, p) => sum + (Number(p.grand_total) || 0), 0);
-                const dayVisitors = walkins.filter(w => normalizeDate(w.walkin_date) === day).length;
-                const dayCalls = telecalls.filter(t => normalizeDate(t.call_date) === day).length;
-                const dayField = fields.filter(f => normalizeDate(f.visit_date) === day).length;
-
-                return (
-                  <tr key={day} className="border-b hover:bg-gray-50 transition">
-                    <td className="px-4 py-3 text-left font-medium text-gray-700">{formatDisplayDate(day)}</td>
-                    <td className="px-4 py-3 font-semibold text-blue-600">
-                      {daySales > 0 ? `₹${daySales.toLocaleString("en-IN")}` : "—"}
-                    </td>
-                    <td className="px-4 py-3">{dayVisitors || "—"}</td>
-                    <td className="px-4 py-3">{dayCalls || "—"}</td>
-                    <td className="px-4 py-3">{dayField || "—"}</td>
-                  </tr>
-                );
-              })}
+              {filter === "year"
+                ? getYearlyMonths().map((ym, idx) => {
+                    const [y, m] = ym.split("-");
+                    const mSales = performaInvoices
+                      .filter(p => { const d = normalizeDate(p.invoice_date); return d.startsWith(`${y}-${m}`); })
+                      .reduce((sum, p) => sum + (Number(p.grand_total) || 0), 0);
+                    const mVisitors = walkins.filter(w => normalizeDate(w.walkin_date).startsWith(`${y}-${m}`)).length;
+                    const mCalls = telecalls.filter(t => normalizeDate(t.call_date).startsWith(`${y}-${m}`)).length;
+                    const mField = fields.filter(f => normalizeDate(f.visit_date).startsWith(`${y}-${m}`)).length;
+                    return (
+                      <tr key={ym} className="border-b hover:bg-gray-50 transition">
+                        <td className="px-4 py-3 text-left font-medium text-gray-700">{monthNames[idx]} {y}</td>
+                        <td className="px-4 py-3 font-semibold text-blue-600">{mSales > 0 ? `₹${mSales.toLocaleString("en-IN")}` : "—"}</td>
+                        <td className="px-4 py-3">{mVisitors || "—"}</td>
+                        <td className="px-4 py-3">{mCalls || "—"}</td>
+                        <td className="px-4 py-3">{mField || "—"}</td>
+                      </tr>
+                    );
+                  })
+                : days.map(day => {
+                    const daySales = performaInvoices
+                      .filter(p => normalizeDate(p.invoice_date) === day)
+                      .reduce((sum, p) => sum + (Number(p.grand_total) || 0), 0);
+                    const dayVisitors = walkins.filter(w => normalizeDate(w.walkin_date) === day).length;
+                    const dayCalls = telecalls.filter(t => normalizeDate(t.call_date) === day).length;
+                    const dayField = fields.filter(f => normalizeDate(f.visit_date) === day).length;
+                    return (
+                      <tr key={day} className="border-b hover:bg-gray-50 transition">
+                        <td className="px-4 py-3 text-left font-medium text-gray-700">{formatDisplayDate(day)}</td>
+                        <td className="px-4 py-3 font-semibold text-blue-600">{daySales > 0 ? `₹${daySales.toLocaleString("en-IN")}` : "—"}</td>
+                        <td className="px-4 py-3">{dayVisitors || "—"}</td>
+                        <td className="px-4 py-3">{dayCalls || "—"}</td>
+                        <td className="px-4 py-3">{dayField || "—"}</td>
+                      </tr>
+                    );
+                  })
+              }
               {/* Totals row */}
               <tr className="bg-blue-50 font-bold text-gray-800 border-t-2 border-blue-200">
                 <td className="px-4 py-3 text-left text-blue-700">TOTAL</td>

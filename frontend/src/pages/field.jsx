@@ -214,13 +214,13 @@ useEffect(() => {
             <form  onSubmit={handleSubmit} action="" className=" invoice-form p-6 space-y-6 relative">
                 <div className="grid grid-cols-4 items-center gap-6">
                    <label htmlFor="" className="text-sm text-gray-600 text-left">Customer Name</label>
-                   <input type="text" name="customer_name" value={form.customer_name} onChange={handleChange}   className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
+                   <input type="text" name="customer_name" value={form.customer_name} onChange={handleChange} placeholder="e.g. Ravi Kumar" onKeyDown={e => { if (/[0-9]/.test(e.key)) e.preventDefault(); }} className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
                 </div>
 
                 {/*  */}
                  <div className="grid grid-cols-4 items-center gap-6">
                    <label htmlFor="" className="text-sm text-gray-600 text-left">Mobile Number</label>
-                   <input type="text" name="mobile_number" value={form.mobile_number} onChange={handleChange} className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
+                   <input type="text" name="mobile_number" value={form.mobile_number} onChange={handleChange} maxLength={13} inputMode="numeric" onKeyDown={e => { if (!/[0-9]/.test(e.key) && !["Backspace","Delete","ArrowLeft","ArrowRight","Tab"].includes(e.key)) e.preventDefault(); }} className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
                 </div>
 
                 {/*  */}
@@ -245,7 +245,7 @@ useEffect(() => {
                 {/*  */}
                 <div className="grid grid-cols-4 items-center gap-6">
                    <label htmlFor="" className="text-sm text-gray-600 text-left">Staff Name</label>
-                   <input type="text" name="staff_name" value={form.staff_name} onChange={handleChange} className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
+                   <input type="text" name="staff_name" value={form.staff_name} onChange={handleChange} placeholder="e.g. Anbu Selvan" onKeyDown={e => { if (/[0-9]/.test(e.key)) e.preventDefault(); }} className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
                 </div>
 
                 {/* Reference */}

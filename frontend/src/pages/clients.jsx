@@ -264,7 +264,9 @@ const Clients = () => {
                 type="text"
                 name="phone"
                 value={form.phone}
-                onChange={handleChange}
+                onChange={e => { if (/^\d{0,13}$/.test(e.target.value)) handleChange(e); }}
+                maxLength={13}
+                inputMode="numeric"
                 className="form-control w-[60%] border rounded-lg p-2"
               />
             </div>

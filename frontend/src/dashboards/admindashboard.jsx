@@ -14,10 +14,11 @@ import axios from "axios";
 import { useAuth } from "../auth/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { useContext } from "react";
-import { DashboardSearchContext } from "../layout/dashboarlayout";
+import { DashboardSearchContext, ReminderContext } from "../layout/dashboarlayout";
 
 const Dashboard = () => {
   const searchQuery = useContext(DashboardSearchContext) || "";
+  const { setReminderData, setReminderNotes } = useContext(ReminderContext);
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -98,6 +99,13 @@ const Dashboard = () => {
     Overdue: leads.filter(l => l.reminder_required === "Yes" && normalizeDate(l.reminder_date) < today && l.reminder_notes),
   };
   const remainderSummary = { Todays: remainderNotes.Todays.length, Due: remainderNotes.Due.length, Overdue: remainderNotes.Overdue.length };
+
+  // Push reminder data to navbar
+  useEffect(() => {
+    setReminderData(remainderSummary);
+    setReminderNotes(remainderNotes);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leads]);
 
   const statusColors = {
     New: { text: "text-orange-500", bg: "bg-orange-500" },

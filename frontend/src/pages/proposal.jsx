@@ -262,11 +262,11 @@ const Proposal = () => {
               <div className="space-y-4">
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-bold text-gray-500 uppercase">Customer Name*</label>
-                  <input type="text" value={customer.customer_name} onChange={e => setCustomer({ ...customer, customer_name: e.target.value })} className="border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-100 bg-gray-50" required />
+                  <input type="text" value={customer.customer_name} onChange={e => { if (!/[0-9]/.test(e.nativeEvent.data)) setCustomer({ ...customer, customer_name: e.target.value }); }} placeholder="e.g. Ravi Kumar" className="border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-100 bg-gray-50" required />
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-bold text-gray-500 uppercase">Mobile Number*</label>
-                  <input type="text" value={customer.mobile_number} onChange={e => setCustomer({ ...customer, mobile_number: e.target.value })} className="border rounded-lg px-4 py-2 outline-none bg-gray-50" required />
+                  <input type="text" value={customer.mobile_number} onChange={e => { if (/^\d{0,13}$/.test(e.target.value)) setCustomer({ ...customer, mobile_number: e.target.value }); }} maxLength={13} inputMode="numeric" className="border rounded-lg px-4 py-2 outline-none bg-gray-50" required />
                 </div>
               </div>
               <div className="space-y-4">

@@ -5,27 +5,31 @@ import {
   Star,
   Clock,
   Bell,
-  Calendar,
-  MessageSquare,
   Settings,
-  PlusCircle,
-  Globe,
   User,
   Lock,
-  LogOut
+  LogOut,
+  X,
+  AlertCircle,
+  CheckCircle,
+  Clock3
 } from "lucide-react";
 import "../Styles/tailwind.css";
 import { useAuth } from "../auth/AuthContext";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
-const Topbar = ({ onHamburgerClick, showSearch, onSearch }) => {
+const Topbar = ({ onHamburgerClick, showSearch, onSearch, reminderData, reminderNotes }) => {
   const [openProfile, setOpenProfile] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const bellRef = useRef(null);
   const [openBell, setOpenBell] = useState(false);
   const [openSettings, setOpenSettings] = useState(false);
+  const [openReminder, setOpenReminder] = useState(false);
+  const [openStar, setOpenStar] = useState(false);
   const settingsRef = useRef(null);
+  const reminderRef = useRef(null);
+  const starRef = useRef(null);
   const [searchValue, setSearchValue] = useState("");
 
   const changeTheme = (theme) => {
@@ -47,12 +51,10 @@ const Topbar = ({ onHamburgerClick, showSearch, onSearch }) => {
 
   useEffect(() => {
     const handler = (e) => {
-      if (profileRef.current && !profileRef.current.contains(e.target)) {
-        setOpenProfile(false);
-      }
-      if (bellRef.current && !bellRef.current.contains(e.target)) {
-        setOpenBell(false);
-      }
+      if (profileRef.current && !profileRef.current.contains(e.target)) setOpenProfile(false);
+      if (bellRef.current && !bellRef.current.contains(e.target)) setOpenBell(false);
+      if (reminderRef.current && !reminderRef.current.contains(e.target)) setOpenReminder(false);
+      if (starRef.current && !starRef.current.contains(e.target)) setOpenStar(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -112,9 +114,66 @@ const Topbar = ({ onHamburgerClick, showSearch, onSearch }) => {
 
       {/* Center icons */}
       <div className="menus-tab text-primary-text">
-        <ul className="flex gap-2 md:gap-4">
-          <li className="hidden md:block"><Star size={20} /></li>
-          <li className="hidden md:block"><Clock size={20} /></li>
+        <ul className="flex gap-2 md:gap-4 items-center">
+
+          {/* Star → dropdown with Clients & Tasks */}
+          <li ref={starRef} className="hidden md:block relative cursor-pointer" title="Quick Links">
+            <Star size={20} onClick={() => setOpenStar(p => !p)}
+              className={`hover:text-blue-500 transition ${openStar ? "text-blue-500" : ""}`} />
+            {openStar && (
+              <div className="absolute left-1/2 -translate-x-1/2 top-9 w-40 bg-white shadow-xl rounded-xl border z-50 overflow-hidden">
+                <div className="px-3 py-2 text-xs font-semibold text-gray-400 uppercase border-b">Quick Links</div>
+                <button onClick={() => { navigate("/dashboard/clients"); setOpenStar(false); }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition flex items-center gap-2">
+                  <span>👥</span> Clients
+                </button>
+                <button onClick={() => { navigate("/dashboard/task"); setOpenStar(false); }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition flex items-center gap-2">
+                  <span>✅</span> Tasks
+                </button>
+              </div>
+            )}
+          </li>
+
+          {/* Clock → Reminder Summary dropdown */}
+          <li ref={reminderRef} className="hidden md:block relative cursor-pointer hover:text-blue-500 transition" title="Reminders">
+            <Clock size={20} onClick={() => setOpenReminder(p => !p)} />
+            {openReminder && (
+              <div className="absolute left-1/2 -translate-x-1/2 top-10 w-80 bg-white shadow-xl rounded-xl border z-50 overflow-hidden">
+                <div className="px-4 py-3 border-b font-semibold text-sm text-gray-700 flex justify-between items-center">
+                  <span>Reminder Summary</span>
+                  <X size={14} className="cursor-pointer text-gray-400 hover:text-red-500" onClick={() => setOpenReminder(false)} />
+                </div>
+                <div className="p-3 grid grid-cols-3 gap-2">
+                  {[
+                    { label: "Today's", key: "Todays", icon: <Clock3 size={16} />, color: "bg-orange-50 border-orange-200 text-orange-600" },
+                    { label: "Due", key: "Due", icon: <CheckCircle size={16} />, color: "bg-green-50 border-green-200 text-green-600" },
+                    { label: "Overdue", key: "Overdue", icon: <AlertCircle size={16} />, color: "bg-red-50 border-red-200 text-red-600" },
+                  ].map(({ label, key, icon, color }) => (
+                    <div key={key} className={`rounded-lg border p-3 text-center ${color}`}>
+                      <div className="flex justify-center mb-1">{icon}</div>
+                      <div className="text-xl font-bold">{reminderData?.[key] ?? 0}</div>
+                      <div className="text-xs font-medium mt-1">{label}</div>
+                    </div>
+                  ))}
+                </div>
+                {reminderNotes && (
+                  <div className="px-4 pb-3 max-h-40 overflow-y-auto">
+                    {["Todays", "Due", "Overdue"].map(key =>
+                      (reminderNotes[key] || []).slice(0, 2).map((n, i) => (
+                        <div key={`${key}-${i}`} className="text-xs text-gray-600 py-1.5 border-b last:border-0">
+                          <span className={`font-semibold mr-1 ${key === "Overdue" ? "text-red-500" : key === "Due" ? "text-green-600" : "text-orange-500"}`}>[{key}]</span>
+                          {n.reminder_notes}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </li>
+
+          {/* Bell → Task Notifications (unchanged) */}
           <li ref={bellRef} className="relative cursor-pointer">
             <Bell size={20} onClick={() => setOpenBell(!openBell)} className="relative" />
             {unreadCount > 0 && (
@@ -143,9 +202,9 @@ const Topbar = ({ onHamburgerClick, showSearch, onSearch }) => {
               </div>
             )}
           </li>
-          <li className="hidden md:block"><Calendar size={20} /></li>
-          <li className="hidden md:block"><MessageSquare size={20} /></li>
-          <li ref={settingsRef} className="relative">
+
+          {/* Settings (unchanged) */}
+          <li ref={settingsRef} className="relative cursor-pointer">
             <Settings size={20} onClick={() => setOpenSettings(!openSettings)} />
             {openSettings && (
               <div className="absolute top-10 right-0 w-44 bg-primary text-primary-text border shadow-lg rounded-md z-50 animate-slide-in-left">
@@ -161,8 +220,7 @@ const Topbar = ({ onHamburgerClick, showSearch, onSearch }) => {
               </div>
             )}
           </li>
-          <li className="hidden md:block"><PlusCircle size={20} /></li>
-          <li className="hidden md:block"><Globe size={20} /></li>
+
         </ul>
       </div>
 
