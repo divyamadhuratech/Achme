@@ -21,6 +21,8 @@ import Task from "./pages/task";
 import Invoicepage from "./pages/invoice";
 import Payments from "./pages/payment";
 import Estimate  from "./pages/estimate";
+import EstimateInvoice from "./pages/estimateinvoice";
+import ServiceEstimation from "./pages/serviceestimation";
 import Contracts from "./pages/contract";
 import Team from "./pages/teammember";
 import Products from "./pages/products";
@@ -57,6 +59,8 @@ export default function App() {
            <Route path="followupslist" element={<FollowupList />} />
            <Route path="clients" element={<Clients />} />
            <Route path="performainvoice" element={<PerformaInvoice />} />
+           <Route path="estimateinvoice" element={<EstimateInvoice />} />
+           <Route path="serviceestimation" element={<ServiceEstimation />} />
            <Route path="reports" element={<Reports />} />
            
           </Route>

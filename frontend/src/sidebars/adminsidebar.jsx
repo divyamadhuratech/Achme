@@ -37,21 +37,22 @@ const Sidebar = ({ onNavigate }) => {
      ]
     },
 
-    { icon: <ShoppingCart size={20} />, title: "Sales",subitems: [
-      {label:"Invoice",path:"/dashboard/invoice"}, 
-      {label:"Payments",path:"/dashboard/payments"},
-      {label:"Estimates",path:"/dashboard/estimates"},
-      {label:"Performa Invoice",path:"/dashboard/performainvoice"}
+    { icon: <ShoppingCart size={20} />, title: "Sales", subitems: [
+      { label: "Invoice", path: "/dashboard/invoice" },
+      { label: "Payments", path: "/dashboard/payments" },
+      { label: "Estimate Invoice", path: "/dashboard/estimateinvoice" },
+      { label: "Performa Invoice", path: "/dashboard/performainvoice" },
     ] },
-      
-    { icon: <FileText size={20} />, title: "Proposals",path:"/dashboard/proposal"},
+
+    { icon: <FileText size={20} />, title: "Proposals", path: "/dashboard/proposal" },
     {
-  icon: <Wrench size={20} />,
-  title: "Services",
-  subitems: [
-    { label: "products", path: "/dashboard/products" }
-  ]
-},
+      icon: <Wrench size={20} />,
+      title: "Services",
+      subitems: [
+        { label: "Products", path: "/dashboard/products" },
+        { label: "Service Estimation", path: "/dashboard/serviceestimation" },
+      ]
+    },
     { icon: <Briefcase size={20} />, title: "Contracts",
      subitems:[{label:"Contracts", path:"/dashboard/contracts"}] },
     { icon: <Users2 size={20} />, title: "Team",subitems:[{label: "Team Member", path:"/dashboard/team"},"Time Sheets" ] },

@@ -32,31 +32,51 @@ router.get("/:id", (req, res) => {
   const sql = `
     SELECT 
       p.id AS performainvoice_id,
-      p.invoice_date,
-      p.subtotal,
-      p.total_tax,
-      p.total_cgst,        
-      p.total_sgst, 
-      p.total_discount,
-      p.grand_total,
-      c.customer_name,
-      c.mobile_number,
-      c.email,
-      c.location_city,
-      pi.product_number,
-      pi.description,
-      pi.price,
-      pi.quantity,
-      pi.subtotal AS item_subtotal
+      p.invoice_date, p.subtotal, p.total_tax, p.total_cgst, p.total_sgst, p.total_discount, p.grand_total,
+      p.reference_no, p.from_address_id, p.from_address_custom,
+      COALESCE(p.from_address_custom, fa.address) AS resolved_from_address,
+      p.client_company, p.client_address1, p.client_address2, p.client_city, p.client_state, p.client_pincode, p.client_country,
+      p.tax_type, p.custom_tax,
+      p.exec_name, p.exec_phone, p.exec_email,
+      p.terms_general, p.terms_tax, p.terms_project_period, p.terms_validity, p.terms_separate_orders,
+      p.terms_payment, p.terms_payment_custom, p.terms_warranty,
+      c.customer_name, c.mobile_number, c.email, c.location_city,
+      pi.product_number, pi.description, pi.price, pi.quantity, pi.subtotal AS item_subtotal,
+      pi.brand_model, pi.uom
     FROM performainvoices p
     JOIN customers c ON c.id = p.customer_id
     JOIN performainvoice_items pi ON pi.invoice_id = p.id
+    LEFT JOIN pi_from_addresses fa ON fa.id = p.from_address_id
     WHERE p.id = ?
   `;
   db.query(sql, [id], (err, rows) => {
     if (err) return res.status(500).json(err);
     if (!rows.length) return res.status(404).json([]);
     res.json(rows);
+  });
+});
+
+/* ================= FROM ADDRESSES API ================= */
+router.get("/from-addresses", (req, res) => {
+  db.query("SELECT * FROM pi_from_addresses ORDER BY id ASC", (err, rows) => {
+    if (err) return res.status(500).json(err);
+    res.json(rows);
+  });
+});
+
+router.post("/from-addresses", (req, res) => {
+  const { label, address } = req.body;
+  if (!label || !address) return res.status(400).json({ message: "Label and address required" });
+  db.query("INSERT INTO pi_from_addresses (label, address) VALUES (?,?)", [label, address], (err, result) => {
+    if (err) return res.status(500).json(err);
+    res.json({ id: result.insertId, label, address });
+  });
+});
+
+router.delete("/from-addresses/:id", (req, res) => {
+  db.query("DELETE FROM pi_from_addresses WHERE id=?", [req.params.id], (err) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: "Deleted" });
   });
 });
 
@@ -80,7 +100,10 @@ router.post("/create", (req, res) => {
   const error = validateInvoice(req.body);
   if (error) return res.status(400).json({ message: error });
 
-  const { customer, performaInvoice, items } = req.body;
+  const { customer, performaInvoice, items, extra } = req.body;
+
+  // Auto-generate reference number: REF-YYYYMMDD-XXXX
+  const refNo = `REF-${new Date().toISOString().slice(0,10).replace(/-/g,"")}-${Math.floor(1000+Math.random()*9000)}`;
 
   db.beginTransaction(err => {
     if (err) return res.status(500).json({ message: "Transaction error" });
@@ -92,41 +115,50 @@ router.post("/create", (req, res) => {
         if (err) return db.rollback(() => res.status(500).json(err));
 
         const customerId = customerResult.insertId;
+        const ex = extra || {};
 
         db.query(
           `INSERT INTO performainvoices
-           (customer_id, invoice_date, total_cgst, total_sgst, subtotal, total_tax, total_discount, grand_total)
-           VALUES (?,?,?,?,?,?,?,?)`,
+           (customer_id, invoice_date, total_cgst, total_sgst, subtotal, total_tax, total_discount, grand_total,
+            reference_no, from_address_id, from_address_custom,
+            client_company, client_address1, client_address2, client_city, client_state, client_pincode, client_country,
+            tax_type, custom_tax,
+            exec_name, exec_phone, exec_email,
+            terms_general, terms_tax, terms_project_period, terms_validity, terms_separate_orders,
+            terms_payment, terms_payment_custom, terms_warranty)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
           [
-            customerId,
-            performaInvoice.invoice_date,
-            performaInvoice.total_cgst,
-            performaInvoice.total_sgst,
-            performaInvoice.subtotal,
-            performaInvoice.total_cgst + performaInvoice.total_sgst,
-            performaInvoice.total_discount,
-            performaInvoice.grand_total,
+            customerId, performaInvoice.invoice_date,
+            performaInvoice.total_cgst, performaInvoice.total_sgst, performaInvoice.subtotal,
+            performaInvoice.total_cgst + performaInvoice.total_sgst, performaInvoice.total_discount, performaInvoice.grand_total,
+            refNo, ex.from_address_id || null, ex.from_address_custom || null,
+            ex.client_company || null, ex.client_address1 || null, ex.client_address2 || null,
+            ex.client_city || null, ex.client_state || null, ex.client_pincode || null, ex.client_country || "India",
+            ex.tax_type || "GST18", ex.custom_tax || null,
+            ex.exec_name || null, ex.exec_phone || null, ex.exec_email || null,
+            ex.terms_general ? 1 : 0, ex.terms_tax ? 1 : 0, ex.terms_project_period || null,
+            ex.terms_validity ? 1 : 0, ex.terms_separate_orders ? JSON.stringify(ex.terms_separate_orders) : null,
+            ex.terms_payment || null, ex.terms_payment_custom || null, ex.terms_warranty || null,
           ],
           (err, result) => {
             if (err) return db.rollback(() => res.status(500).json(err));
 
             const invoiceId = result.insertId;
-
             const values = items.map((item, index) => [
-              invoiceId, index + 1, item.description, item.price, item.quantity, item.tax, item.discount, item.subtotal
+              invoiceId, index + 1, item.description, item.price, item.quantity, item.tax, item.discount, item.subtotal,
+              item.brand_model || null, item.uom || "Nos"
             ]);
 
             db.query(
               `INSERT INTO performainvoice_items
-               (invoice_id, product_number, description, price, quantity, tax, discount, subtotal)
+               (invoice_id, product_number, description, price, quantity, tax, discount, subtotal, brand_model, uom)
                VALUES ?`,
               [values],
               err => {
                 if (err) return db.rollback(() => res.status(500).json(err));
-
                 db.commit(err => {
                   if (err) return db.rollback(() => res.status(500).json(err));
-                  res.status(201).json({ message: "Created Successfully", invoiceId });
+                  res.status(201).json({ message: "Created Successfully", invoiceId, reference_no: refNo });
                 });
               }
             );
@@ -143,27 +175,42 @@ router.put("/:id", (req, res) => {
   if (error) return res.status(400).json({ message: error });
   
   const { id } = req.params;
-  const { customer, performaInvoice, items } = req.body;
+  const { customer, performaInvoice, items, extra } = req.body;
+  const ex = extra || {};
 
   db.beginTransaction(err => {
     if (err) return res.status(500).json(err);
 
     db.query(
-      `UPDATE customers
-       SET customer_name=?, mobile_number=?, email=?, location_city=?
+      `UPDATE customers SET customer_name=?, mobile_number=?, email=?, location_city=?
        WHERE id = (SELECT customer_id FROM performainvoices WHERE id=?)`,
       [customer.customer_name, customer.mobile_number, customer.email, customer.location_city, id],
       err => {
         if (err) return db.rollback(() => res.status(500).json(err));
 
         db.query(
-          `UPDATE performainvoices
-           SET invoice_date=?, subtotal=?, total_cgst=?, total_sgst=?, total_tax=?, total_discount=?, grand_total=?
+          `UPDATE performainvoices SET
+           invoice_date=?, subtotal=?, total_cgst=?, total_sgst=?, total_tax=?, total_discount=?, grand_total=?,
+           from_address_id=?, from_address_custom=?,
+           client_company=?, client_address1=?, client_address2=?, client_city=?, client_state=?, client_pincode=?, client_country=?,
+           tax_type=?, custom_tax=?,
+           exec_name=?, exec_phone=?, exec_email=?,
+           terms_general=?, terms_tax=?, terms_project_period=?, terms_validity=?, terms_separate_orders=?,
+           terms_payment=?, terms_payment_custom=?, terms_warranty=?
            WHERE id=?`,
           [
             performaInvoice.invoice_date, performaInvoice.subtotal, performaInvoice.total_cgst,
             performaInvoice.total_sgst, performaInvoice.total_cgst + performaInvoice.total_sgst,
-            performaInvoice.total_discount, performaInvoice.grand_total, id
+            performaInvoice.total_discount, performaInvoice.grand_total,
+            ex.from_address_id || null, ex.from_address_custom || null,
+            ex.client_company || null, ex.client_address1 || null, ex.client_address2 || null,
+            ex.client_city || null, ex.client_state || null, ex.client_pincode || null, ex.client_country || "India",
+            ex.tax_type || "GST18", ex.custom_tax || null,
+            ex.exec_name || null, ex.exec_phone || null, ex.exec_email || null,
+            ex.terms_general ? 1 : 0, ex.terms_tax ? 1 : 0, ex.terms_project_period || null,
+            ex.terms_validity ? 1 : 0, ex.terms_separate_orders ? JSON.stringify(ex.terms_separate_orders) : null,
+            ex.terms_payment || null, ex.terms_payment_custom || null, ex.terms_warranty || null,
+            id
           ],
           err => {
             if (err) return db.rollback(() => res.status(500).json(err));
@@ -172,12 +219,13 @@ router.put("/:id", (req, res) => {
               if (err) return db.rollback(() => res.status(500).json(err));
 
               const values = items.map((item, index) => [
-                id, index + 1, item.description, item.price, item.quantity, item.tax, item.discount, item.subtotal
+                id, index + 1, item.description, item.price, item.quantity, item.tax, item.discount, item.subtotal,
+                item.brand_model || null, item.uom || "Nos"
               ]);
 
               db.query(
                 `INSERT INTO performainvoice_items
-                 (invoice_id, product_number, description, price, quantity, tax, discount, subtotal)
+                 (invoice_id, product_number, description, price, quantity, tax, discount, subtotal, brand_model, uom)
                  VALUES ?`,
                 [values],
                 err => {
@@ -252,7 +300,7 @@ router.post("/send-email/:id", (req, res) => {
 
       try {
         // Generate PDF with exact same design as the app
-        const pdfBuffer = await generateInvoicePdf({ invoice, items, type: "performa" });
+        const pdfBuffer = await generateInvoicePdf({ invoice, items, type: "performa", label: "PERFORMA INVOICE", prefix: "PI" });
 
         const transporter = nodemailer.createTransport({
           service: "gmail",

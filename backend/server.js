@@ -41,6 +41,8 @@ app.use("/api/estimate", require("./routes/estimate"));
 app.use("/api/contract", require("./routes/contract"));
 app.use("/api/teammember", require("./routes/team"));
 app.use("/api/performainvoice", require("./routes/performaInvoiceRoutes"));
+app.use("/api/estimate-invoice", require("./routes/estimateInvoiceRoutes"));
+app.use("/api/service-estimation", require("./routes/serviceEstimationRoutes"));
 app.use("/api/services", require("./routes/serviceRoutes"));
 app.use("/uploads", express.static("uploads"));
 

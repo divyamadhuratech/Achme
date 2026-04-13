@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Plus, Search, Download, X, Edit2, MinusCircle, PlusCircle, Trash2, Mail, MapPin, ChevronDown } from "lucide-react";
-import Invoice from "../components/invoicetemplate";
 import { calculateItemTotal, calculateTotals } from "../utils/invoicecal";
 import axios from "axios";
 import html2pdf from "html2pdf.js";
+import "../Styles/tailwind.css";
+import Invoice from "../components/invoicetemplate";
 
 const UOM_OPTIONS = ["Nos", "Units", "Pieces", "Boxes", "Sets", "Meters", "Kg", "Liters"];
 const TAX_OPTIONS = [
@@ -27,8 +28,8 @@ const emptyExtra = () => ({
   terms_payment: "", terms_payment_custom: "", terms_warranty: "",
 });
 
-const PerformaInvoice = () => {
-  const [performaInvoices, setPerformaInvoices] = useState([]);
+const EstimateInvoice = () => {
+  const [estimateInvoices, setEstimateInvoices] = useState([]);
   const [quotations, setQuotations] = useState([]);
   const [fromAddresses, setFromAddresses] = useState([]);
   const [open, setOpen] = useState(false);
@@ -48,34 +49,24 @@ const PerformaInvoice = () => {
 
   const [items, setItems] = useState([{ name: "", brand_model: "", uom: "Nos", price: 0, qty: 1, tax: 18, discount: 0 }]);
   const [customer, setCustomer] = useState({ customer_name: "", mobile_number: "", email: "", location_city: "" });
-  const [performaInvoice, setPerformaInvoice] = useState({ invoice_date: new Date().toISOString().slice(0, 10) });
+  const [estimateInvoice, setEstimateInvoice] = useState({ invoice_date: new Date().toISOString().slice(0, 10) });
   const [extra, setExtra] = useState(emptyExtra());
 
   const invoiceRef = useRef(null);
 
-  const formatPINumber = (id, dateStr) => {
+  const formatEINumber = (id, dateStr) => {
     const year = dateStr ? new Date(dateStr).getFullYear() : new Date().getFullYear();
-    return `PI-${year}-${String(id).padStart(3, "0")}`;
-  };
-
-  const downloadPDF = () => {
-    if (!invoiceRef.current) return;
-    html2pdf().from(invoiceRef.current).set({
-      margin: 10, filename: `Performa_Invoice_${viewId}.pdf`,
-      image: { type: "jpeg", quality: 0.98 },
-      html2canvas: { scale: 2 },
-      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-    }).save();
+    return `EI-${year}-${String(id).padStart(3, "0")}`;
   };
 
   useEffect(() => {
-    fetchPerformaInvoices();
+    fetchEstimateInvoices();
     fetchQuotations();
     fetchFromAddresses();
   }, []);
 
-  const fetchPerformaInvoices = async () => {
-    try { const res = await axios.get("http://localhost:3000/api/performainvoice"); setPerformaInvoices(res.data); }
+  const fetchEstimateInvoices = async () => {
+    try { const res = await axios.get("http://localhost:3000/api/estimate-invoice"); setEstimateInvoices(res.data); }
     catch (err) { console.error(err); }
   };
   const fetchQuotations = async () => {
@@ -83,14 +74,14 @@ const PerformaInvoice = () => {
     catch (err) { console.error(err); }
   };
   const fetchFromAddresses = async () => {
-    try { const res = await axios.get("http://localhost:3000/api/performainvoice/from-addresses"); setFromAddresses(res.data); }
+    try { const res = await axios.get("http://localhost:3000/api/estimate-invoice/from-addresses"); setFromAddresses(res.data); }
     catch (err) { console.error(err); }
   };
 
   const handleAddAddress = async () => {
     if (!newAddrLabel || !newAddrText) return alert("Label and address required");
     try {
-      const res = await axios.post("http://localhost:3000/api/performainvoice/from-addresses", { label: newAddrLabel, address: newAddrText });
+      const res = await axios.post("http://localhost:3000/api/estimate-invoice/from-addresses", { label: newAddrLabel, address: newAddrText });
       setFromAddresses(prev => [...prev, res.data]);
       setNewAddrLabel(""); setNewAddrText(""); setShowAddAddress(false);
     } catch (err) { alert("Failed to add address"); }
@@ -99,7 +90,7 @@ const PerformaInvoice = () => {
   const handleDeleteAddress = async (id) => {
     if (!window.confirm("Remove this address?")) return;
     try {
-      await axios.delete(`http://localhost:3000/api/performainvoice/from-addresses/${id}`);
+      await axios.delete(`http://localhost:3000/api/estimate-invoice/from-addresses/${id}`);
       setFromAddresses(prev => prev.filter(a => a.id !== id));
       if (extra.from_address_id === id) setExtra(e => ({ ...e, from_address_id: "" }));
     } catch (err) { alert("Failed to delete address"); }
@@ -121,11 +112,11 @@ const PerformaInvoice = () => {
   };
 
   const handleEdit = async (id) => {
-    const res = await axios.get(`http://localhost:3000/api/performainvoice/${id}`);
+    const res = await axios.get(`http://localhost:3000/api/estimate-invoice/${id}`);
     const rows = res.data;
     const h = rows[0];
     setCustomer({ customer_name: h.customer_name, mobile_number: h.mobile_number, email: h.email, location_city: h.location_city });
-    setPerformaInvoice({ invoice_date: h.invoice_date?.split("T")[0] || "" });
+    setEstimateInvoice({ invoice_date: h.invoice_date?.split("T")[0] || "" });
     const loadedItems = rows.map(r => ({ name: r.description, brand_model: r.brand_model || "", uom: r.uom || "Nos", price: Number(r.price) || 0, qty: Number(r.quantity) || 1, tax: 18, discount: Number(r.discount) || 0 }));
     setItems(loadedItems);
     setDescInput(loadedItems.map(i => i.name).join(", "));
@@ -155,7 +146,7 @@ const PerformaInvoice = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!performaInvoice.invoice_date) return alert("Please select date");
+    if (!estimateInvoice.invoice_date) return alert("Please select date");
     if (items.some(i => !i.name.trim())) return alert("Description cannot be empty");
     try {
       const taxRate = getTaxRate();
@@ -163,8 +154,8 @@ const PerformaInvoice = () => {
       const totals = calculateTotals(taxedItems);
       const payload = {
         customer,
-        performaInvoice: {
-          invoice_date: performaInvoice.invoice_date,
+        invoice: {
+          invoice_date: estimateInvoice.invoice_date,
           subtotal: totals.subtotal, total_discount: totals.total_discount,
           total_cgst: totals.total_cgst, total_sgst: totals.total_sgst,
           total_tax: totals.total_cgst + totals.total_sgst, grand_total: totals.grand_total,
@@ -176,21 +167,21 @@ const PerformaInvoice = () => {
         extra,
       };
       if (editId) {
-        await axios.put(`http://localhost:3000/api/performainvoice/${editId}`, payload);
+        await axios.put(`http://localhost:3000/api/estimate-invoice/${editId}`, payload);
         alert("Updated successfully");
       } else {
-        await axios.post("http://localhost:3000/api/performainvoice/create", payload);
+        await axios.post("http://localhost:3000/api/estimate-invoice/create", payload);
         alert("Created successfully");
       }
-      setOpen(false); resetForm(); fetchPerformaInvoices();
-    } catch (err) { console.error(err); alert("Error saving Performa Invoice"); }
+      setOpen(false); resetForm(); fetchEstimateInvoices();
+    } catch (err) { console.error(err); alert("Error saving Estimate Invoice"); }
   };
 
   const resetForm = () => {
     setCustomer({ customer_name: "", mobile_number: "", email: "", location_city: "" });
     setItems([{ name: "", brand_model: "", uom: "Nos", price: 0, qty: 1, tax: 18, discount: 0 }]);
     setDescInput("");
-    setPerformaInvoice({ invoice_date: new Date().toISOString().slice(0, 10) });
+    setEstimateInvoice({ invoice_date: new Date().toISOString().slice(0, 10) });
     setExtra(emptyExtra());
     setEditId(null);
   };
@@ -199,16 +190,16 @@ const PerformaInvoice = () => {
     if (!selectedId) return alert("Select an item to delete");
     if (!window.confirm("Are you sure?")) return;
     try {
-      await axios.delete(`http://localhost:3000/api/performainvoice/${selectedId}`);
-      setSelectedId(null); setViewId(null); fetchPerformaInvoices();
+      await axios.delete(`http://localhost:3000/api/estimate-invoice/${selectedId}`);
+      setSelectedId(null); fetchEstimateInvoices();
     } catch (error) { console.error(error); }
   };
 
   const openMailModal = () => {
     if (!selectedId) return alert("Select an invoice to send");
-    const inv = performaInvoices.find(p => p.id === selectedId);
+    const inv = estimateInvoices.find(p => p.id === selectedId);
     setMailTo(inv?.email || "");
-    setMailSubject(`Proforma Invoice ${formatPINumber(selectedId, inv?.invoice_date)}`);
+    setMailSubject(`Estimate Invoice ${formatEINumber(selectedId, inv?.invoice_date)}`);
     setMailOpen(true);
   };
 
@@ -216,7 +207,7 @@ const PerformaInvoice = () => {
     if (!mailTo) return alert("Please enter recipient email");
     setMailSending(true);
     try {
-      await axios.post(`http://localhost:3000/api/performainvoice/send-email/${selectedId}`, { to: mailTo, subject: mailSubject });
+      await axios.post(`http://localhost:3000/api/estimate-invoice/send-email/${selectedId}`, { to: mailTo, subject: mailSubject });
       alert("Email sent successfully"); setMailOpen(false);
     } catch (error) { alert(error.response?.data?.message || "Failed to send email"); }
     finally { setMailSending(false); }
@@ -239,7 +230,7 @@ const PerformaInvoice = () => {
     return () => document.body.classList.remove("modal-open");
   }, [open, mailOpen]);
 
-  const filteredInvoices = performaInvoices.filter(q => q.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredInvoices = estimateInvoices.filter(q => q.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()));
   const taxRate = getTaxRate();
 
   const SectionTitle = ({ children }) => (
@@ -255,8 +246,8 @@ const PerformaInvoice = () => {
       {/* Header */}
       <div className="invoice-heading-tab flex gap-4 justify-between items-center flex-wrap">
         <div>
-          <h2 className="text-2xl font-bold text-[#1694CE]">Proforma Invoice</h2>
-          <nav className="text-sm text-gray-500">Dashboard &gt; Finance &gt; Proforma Invoice</nav>
+          <h2 className="text-2xl font-bold text-[#1694CE]">Estimate Invoice</h2>
+          <nav className="text-sm text-gray-500">Dashboard &gt; Finance &gt; Estimate Invoice</nav>
         </div>
         <div className="flex gap-3 flex-wrap">
           <div className="flex items-center gap-3 bg-gray-100 px-3 py-1 rounded-lg border h-10 mt-2">
@@ -264,7 +255,7 @@ const PerformaInvoice = () => {
             <input type="text" placeholder="Search by customer..." className="outline-none text-sm w-40 bg-transparent" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           </div>
           <div className="flex items-center gap-2 mt-2">
-            <button onClick={downloadPDF} title="Download PDF" className="w-10 h-10 bg-white border rounded-lg shadow-sm flex justify-center items-center hover:bg-gray-50 transition"><Download size={20} /></button>
+            <button onClick={() => { if (invoiceRef.current) { html2pdf().from(invoiceRef.current).set({ margin: 10, filename: `Estimate_Invoice_${viewId}.pdf`, image: { type: "jpeg", quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: "mm", format: "a4", orientation: "portrait" } }).save(); } }} title="Download PDF" className="w-10 h-10 bg-white border rounded-lg shadow-sm flex justify-center items-center hover:bg-gray-50 transition"><Download size={20} /></button>
             <button onClick={openMailModal} title="Send Email" className="w-10 h-10 bg-white border rounded-lg shadow-sm flex justify-center items-center hover:bg-gray-50 transition"><Mail size={18} /></button>
             <button onClick={() => { if (!selectedId) return alert("Select an item"); handleEdit(selectedId); }} title="Edit" className="w-10 h-10 bg-white border rounded-lg shadow-sm flex justify-center items-center hover:bg-gray-50 transition"><Edit2 size={18} /></button>
             <button onClick={handleDelete} title="Delete" className="w-10 h-10 bg-white border rounded-lg shadow-sm flex justify-center items-center hover:bg-gray-50 transition"><Trash2 size={18} className="text-red-500" /></button>
@@ -276,45 +267,42 @@ const PerformaInvoice = () => {
       </div>
 
       {/* Table */}
-      {!viewId && (
-        <div className="bg-white shadow-sm rounded-xl mt-6 overflow-hidden border border-gray-100 overflow-x-auto">
-          <table className="w-full text-sm text-center border-collapse min-w-[600px]">
-            <thead className="bg-[#f8fafc]">
-              <tr className="text-gray-700 font-bold uppercase text-xs border-b border-gray-200">
-                <th className="px-4 py-4 border-r">PI Number</th>
-                <th className="px-4 py-4 border-r">Customer Name</th>
-                <th className="px-4 py-4 border-r">Email</th>
-                <th className="px-4 py-4 border-r">Mobile</th>
-                <th className="px-4 py-4 border-r">Date</th>
-                <th className="px-4 py-4 border-r">Total</th>
-                <th className="px-4 py-4 border-r">City</th>
+      <div className="bg-white shadow-sm rounded-xl mt-6 overflow-hidden border border-gray-100 overflow-x-auto">
+        <table className="w-full text-sm text-center border-collapse min-w-[600px]">
+          <thead className="bg-[#f8fafc]">
+            <tr className="text-gray-700 font-bold uppercase text-xs border-b border-gray-200">
+              <th className="px-4 py-4 border-r">EI Number</th>
+              <th className="px-4 py-4 border-r">Customer Name</th>
+              <th className="px-4 py-4 border-r">Email</th>
+              <th className="px-4 py-4 border-r">Mobile</th>
+              <th className="px-4 py-4 border-r">Date</th>
+              <th className="px-4 py-4 border-r">Total</th>
+              <th className="px-4 py-4 border-r">City</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredInvoices.map(p => (
+              <tr key={p.id} onClick={() => setSelectedId(p.id)} onDoubleClick={() => { setViewId(p.id); setTimeout(() => setShowInvoice(true), 50); }}
+                className={`cursor-pointer border-b hover:bg-gray-50 transition ${selectedId === p.id ? "bg-blue-50/50" : ""}`}>
+                <td className="px-4 py-4 border-r font-medium text-blue-600">{formatEINumber(p.id, p.invoice_date)}</td>
+                <td className="px-4 py-4 border-r">{p.customer_name}</td>
+                <td className="px-4 py-4 border-r text-gray-500">{p.email || "---"}</td>
+                <td className="px-4 py-4 border-r">{p.mobile_number}</td>
+                <td className="px-4 py-4 border-r">{formatDate(p.invoice_date)}</td>
+                <td className="px-4 py-4 border-r font-bold text-gray-900">&#8377;{p.grand_total?.toLocaleString()}</td>
+                <td className="px-4 py-4 border-r">{p.location_city}</td>
               </tr>
-            </thead>
-            <tbody>
-              {filteredInvoices.map(p => (
-                <tr key={p.id} onClick={() => setSelectedId(p.id)} onDoubleClick={() => { setViewId(p.id); setTimeout(() => setShowInvoice(true), 50); }}
-                  className={`cursor-pointer border-b hover:bg-gray-50 transition ${selectedId === p.id ? "bg-blue-50/50" : ""}`}>
-                  <td className="px-4 py-4 border-r font-medium text-blue-600">{formatPINumber(p.id, p.invoice_date)}</td>
-                  <td className="px-4 py-4 border-r">{p.customer_name}</td>
-                  <td className="px-4 py-4 border-r text-gray-500">{p.email || "---"}</td>
-                  <td className="px-4 py-4 border-r">{p.mobile_number}</td>
-                  <td className="px-4 py-4 border-r">{formatDate(p.invoice_date)}</td>
-                  <td className="px-4 py-4 border-r font-bold text-gray-900">&#8377;{p.grand_total?.toLocaleString()}</td>
-                  <td className="px-4 py-4 border-r">{p.location_city}</td>
-                </tr>
-              ))}
-              {filteredInvoices.length === 0 && (<tr><td colSpan="7" className="py-10 text-gray-400 italic">No invoices found</td></tr>)}
-            </tbody>
-          </table>
-          <p className="p-3 text-xs text-gray-400 italic text-left">Double-click a row to preview invoice</p>
-        </div>
-      )}
+            ))}
+            {filteredInvoices.length === 0 && (<tr><td colSpan="7" className="py-10 text-gray-400 italic">No invoices found</td></tr>)}
+          </tbody>
+        </table>
+      </div>
 
       {/* Create/Edit Form Modal */}
       <div className={`overlay ${open ? "show" : ""} flex justify-center items-start overflow-y-auto pt-6 pb-10`}>
         <div className="bg-white rounded-xl shadow-2xl w-[95%] max-w-5xl p-8 relative">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold text-gray-800">{editId ? "Edit Proforma Invoice" : "Create Proforma Invoice"}</h2>
+            <h2 className="text-2xl font-bold text-gray-800">{editId ? "Edit Estimate Invoice" : "Create Estimate Invoice"}</h2>
             <X className="cursor-pointer text-gray-400 hover:text-red-500" onClick={() => { setOpen(false); resetForm(); }} />
           </div>
 
@@ -426,7 +414,7 @@ const PerformaInvoice = () => {
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-bold text-gray-500 uppercase">Invoice Date *</label>
-                <input type="date" value={performaInvoice.invoice_date} onChange={e => setPerformaInvoice({ ...performaInvoice, invoice_date: e.target.value })} className="border rounded-lg px-3 py-2 outline-none text-sm" required />
+                <input type="date" value={estimateInvoice.invoice_date} onChange={e => setEstimateInvoice({ ...estimateInvoice, invoice_date: e.target.value })} className="border rounded-lg px-3 py-2 outline-none text-sm" required />
               </div>
             </div>
 
@@ -631,7 +619,7 @@ const PerformaInvoice = () => {
       <div className={`overlay ${mailOpen ? "show" : ""} flex justify-center items-center`}>
         <div className="bg-white rounded-xl shadow-2xl w-[90%] max-w-lg p-8 relative">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Mail size={20} /> Send Proforma Invoice</h2>
+            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Mail size={20} /> Send Estimate Invoice</h2>
             <X className="cursor-pointer text-gray-400 hover:text-red-500" onClick={() => setMailOpen(false)} />
           </div>
           <div className="space-y-4">
@@ -659,11 +647,11 @@ const PerformaInvoice = () => {
           <div className="flex gap-3 absolute right-6 top-6 z-10">
             <X className="cursor-pointer text-gray-400 hover:text-red-500 bg-white rounded-full p-1" onClick={() => { setShowInvoice(false); setTimeout(() => setViewId(null), 400); }} />
           </div>
-          <Invoice performaInvoiceId={viewId} />
+          <Invoice estimateInvoiceId={viewId} />
         </div>
       )}
     </div>
   );
 };
 
-export default PerformaInvoice;
+export default EstimateInvoice;

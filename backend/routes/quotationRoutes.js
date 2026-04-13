@@ -2,31 +2,39 @@ const express = require("express");
 const router = express.Router();
 const db = require("../config/database");
 
+// FROM ADDRESSES (shared table)
+router.get("/from-addresses", (req, res) => {
+  db.query("SELECT * FROM pi_from_addresses ORDER BY id ASC", (err, rows) => {
+    if (err) return res.status(500).json(err);
+    res.json(rows);
+  });
+});
+router.post("/from-addresses", (req, res) => {
+  const { label, address } = req.body;
+  if (!label || !address) return res.status(400).json({ message: "Label and address required" });
+  db.query("INSERT INTO pi_from_addresses (label, address) VALUES (?,?)", [label, address], (err, result) => {
+    if (err) return res.status(500).json(err);
+    res.json({ id: result.insertId, label, address });
+  });
+});
+router.delete("/from-addresses/:id", (req, res) => {
+  db.query("DELETE FROM pi_from_addresses WHERE id=?", [req.params.id], (err) => {
+    if (err) return res.status(500).json(err);
+    res.json({ message: "Deleted" });
+  });
+});
 
-// GET ALL QUOTATIONS (FOR TABLE)
 router.get("/", (req, res) => {
   const sql = `
-    SELECT
-      q.id,
-      q.quotation_date,
-      q.grand_total,
-      c.customer_name,
-      c.mobile_number,
-      c.location_city,
-      c.email,
-      MIN(qi.description) AS description
+    SELECT q.id, q.quotation_date AS invoice_date, q.grand_total, q.reference_no,
+           c.customer_name, c.mobile_number, c.location_city, c.email,
+           MIN(qi.description) AS description
     FROM quotations q
     JOIN customers c ON c.id = q.customer_id
     LEFT JOIN quotation_items qi ON qi.quotation_id = q.id
-    GROUP BY q.id
-    ORDER BY q.id ASC
-  `;
-
+    GROUP BY q.id ORDER BY q.id ASC`;
   db.query(sql, (err, rows) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).json(err);
-    }
+    if (err) { console.error(err); return res.status(500).json(err); }
     res.json(rows);
   });
 });
@@ -36,32 +44,27 @@ router.get("/", (req, res) => {
 /* GET INVOICE */
 router.get("/:id", (req, res) => {
   const id = req.params.id;
-
   const sql = `
     SELECT 
       q.id AS quotation_id,
-      q.quotation_date,
-      q.subtotal,
-      q.total_tax,
-       q.total_cgst,        
-      q.total_sgst, 
-      q.total_discount,
-      q.grand_total,
-      c.customer_name,
-      c.mobile_number,
-      c.email,
-      c.location_city,
-      qi.product_number,
-      qi.description,
-      qi.price,
-      qi.quantity,
-      qi.subtotal AS item_subtotal
+      q.quotation_date AS invoice_date,
+      q.subtotal, q.total_tax, q.total_cgst, q.total_sgst, q.total_discount, q.grand_total,
+      q.reference_no, q.from_address_id, q.from_address_custom,
+      COALESCE(q.from_address_custom, fa.address) AS resolved_from_address,
+      q.client_company, q.client_address1, q.client_address2, q.client_city,
+      q.client_state, q.client_pincode, q.client_country,
+      q.tax_type, q.custom_tax, q.exec_name, q.exec_phone, q.exec_email,
+      q.terms_general, q.terms_tax, q.terms_project_period, q.terms_validity,
+      q.terms_separate_orders, q.terms_payment, q.terms_payment_custom, q.terms_warranty,
+      c.customer_name, c.mobile_number, c.email, c.location_city,
+      qi.product_number, qi.description, qi.brand_model, qi.uom,
+      qi.price, qi.quantity, qi.subtotal AS item_subtotal
     FROM quotations q
     JOIN customers c ON c.id = q.customer_id
     JOIN quotation_items qi ON qi.quotation_id = q.id
+    LEFT JOIN pi_from_addresses fa ON fa.id = q.from_address_id
     WHERE q.id = ?
   `;
-
   db.query(sql, [id], (err, rows) => {
     if (err) return res.status(500).json(err);
     if (!rows.length) return res.status(404).json([]);
@@ -71,116 +74,92 @@ router.get("/:id", (req, res) => {
 
 /* ================= CREATE QUOTATION ================= */
 
-const validateQuotation = ({ customer, quotation, items }) => {
-  if (!customer.customer_name)
-    return "Customer name is required";
+const validateQuotation = (body) => {
+  if (!body || typeof body !== "object") return "Invalid request body";
+  const { customer, quotation, invoice, items } = body;
+  const q = quotation || invoice; // support both field names
+  const c = customer || {};
 
-  if (!customer.mobile_number)
-    return "Mobile number is required";
-
-  if (!quotation.quotation_date)
-    return "Quotation date is required";
-
-  if (!items || items.length === 0)
-    return "At least one item is required";
+  if (!c.customer_name) return "Customer name is required";
+  if (!c.mobile_number) return "Mobile number is required";
+  if (!q || !q.quotation_date && !q.invoice_date) return "Date is required";
+  if (!items || items.length === 0) return "At least one item is required";
 
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
-
-    if (!item.description)
-      return `Item ${i + 1}: Description is required`;
-
-    if (item.price === "" || item.price === null)
-      return `Item ${i + 1}: Price is required`;
-
-    if (!item.quantity || item.quantity <= 0)
-      return `Item ${i + 1}: Quantity must be greater than 0`;
+    if (!item.description) return `Item ${i + 1}: Description is required`;
+    if (item.price === "" || item.price === null || item.price === undefined) return `Item ${i + 1}: Price is required`;
+    if (!item.quantity || item.quantity <= 0) return `Item ${i + 1}: Quantity must be greater than 0`;
   }
-
   return null;
 };
 
 
 router.post("/create", (req, res) => {
-
   const error = validateQuotation(req.body);
-  if (error) {
-    return res.status(400).json({ message: error });
-  }
+  if (error) return res.status(400).json({ message: error });
 
-  const { customer, quotation, items } = req.body;
-
-     const quotationDate =
-    quotation.quotation_date &&
-    quotation.quotation_date !== "0000-00-00"
-      ? quotation.quotation_date
-      : new Date().toISOString().slice(0, 10);
+  const { customer, quotation, invoice, items, extra } = req.body;
+  const q = quotation || invoice; // unified form sends "invoice"
+  const ex = extra || {};
+  const refNo = `QT-${new Date().toISOString().slice(0,10).replace(/-/g,"")}-${Math.floor(1000+Math.random()*9000)}`;
+  const quotationDate = (q && (q.quotation_date || q.invoice_date)) || new Date().toISOString().slice(0,10);
 
   db.beginTransaction(err => {
-  if (err) return res.status(500).json({ message: "Transaction error" });
+    if (err) return res.status(500).json({ message: "Transaction error" });
 
-
+    // Save to customers table
     db.query(
-      `INSERT INTO customers (customer_name, mobile_number, email, location_city)
-       VALUES (?,?,?,?)`,
-      [
-        customer.customer_name,
-        customer.mobile_number,
-        customer.email,
-        customer.location_city,
-      ],
+      `INSERT INTO customers (customer_name, mobile_number, email, location_city) VALUES (?,?,?,?)`,
+      [customer.customer_name, customer.mobile_number, customer.email, customer.location_city],
       (err, customerResult) => {
         if (err) return db.rollback(() => res.status(500).json(err));
-
         const customerId = customerResult.insertId;
 
-        
+        // Also save to clients table for cross-module reuse
+        db.query(
+          `INSERT INTO clients (name, company_name, email, phone) VALUES (?,?,?,?)`,
+          [customer.customer_name, ex.client_company || customer.customer_name, customer.email, customer.mobile_number],
+          () => {} // non-blocking, best effort
+        );
 
         db.query(
           `INSERT INTO quotations
-           (customer_id, quotation_date,  total_cgst, total_sgst, subtotal, total_tax, total_discount, grand_total)
-           VALUES (?,?,?,?,?,?,?,?)`,
+           (customer_id, quotation_date, total_cgst, total_sgst, subtotal, total_tax, total_discount, grand_total,
+            reference_no, from_address_id, from_address_custom,
+            client_company, client_address1, client_address2, client_city, client_state, client_pincode, client_country,
+            tax_type, custom_tax, exec_name, exec_phone, exec_email,
+            terms_general, terms_tax, terms_project_period, terms_validity, terms_separate_orders,
+            terms_payment, terms_payment_custom, terms_warranty)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
           [
-            customerId,
-             quotation.quotation_date,
-            quotation.subtotal,
-            quotation.total_cgst,
-             quotation.total_sgst,
-            quotation.total_cgst + quotation.total_sgst,
-            quotation.total_discount,
-            quotation.grand_total,
+            customerId, quotationDate,
+            q.total_cgst || 0, q.total_sgst || 0, q.subtotal || 0,
+            (q.total_cgst || 0) + (q.total_sgst || 0), q.total_discount || 0, q.grand_total || 0,
+            refNo, ex.from_address_id || null, ex.from_address_custom || null,
+            ex.client_company || null, ex.client_address1 || null, ex.client_address2 || null,
+            ex.client_city || null, ex.client_state || null, ex.client_pincode || null, ex.client_country || "India",
+            ex.tax_type || "GST18", ex.custom_tax || null,
+            ex.exec_name || null, ex.exec_phone || null, ex.exec_email || null,
+            ex.terms_general ? 1 : 0, ex.terms_tax ? 1 : 0, ex.terms_project_period || null,
+            ex.terms_validity ? 1 : 0, ex.terms_separate_orders ? JSON.stringify(ex.terms_separate_orders) : null,
+            ex.terms_payment || null, ex.terms_payment_custom || null, ex.terms_warranty || null,
           ],
           (err, quotationResult) => {
             if (err) return db.rollback(() => res.status(500).json(err));
-
             const quotationId = quotationResult.insertId;
-
             const values = items.map((item, index) => [
-              quotationId,
-              index + 1,
-              item.description,
-              item.price,
-              item.quantity,
-              item.tax,
-              item.discount,
-              item.subtotal,
+              quotationId, index + 1, item.description, item.brand_model || null, item.uom || "Nos",
+              item.price, item.quantity, item.tax, item.discount, item.subtotal,
             ]);
-
             db.query(
-              `INSERT INTO quotation_items
-               (quotation_id, product_number, description, price, quantity, tax, discount, subtotal)
-               VALUES ?`,
+              `INSERT INTO quotation_items (quotation_id, product_number, description, brand_model, uom, price, quantity, tax, discount, subtotal) VALUES ?`,
               [values],
               err => {
                 if (err) return db.rollback(() => res.status(500).json(err));
-
                 db.commit(err => {
                   if (err) return db.rollback(() => res.status(500).json(err));
-
-                  res.status(201).json({
-                    message: "Quotation Created Successfully",
-                    quotationId,
-                  });
+                  res.status(201).json({ message: "Quotation Created Successfully", quotationId, reference_no: refNo });
                 });
               }
             );
@@ -201,84 +180,66 @@ router.put("/:id", (req, res) => {
   }
   
   const { id } = req.params;
-  const { customer, quotation, items } = req.body;
+  const { customer, quotation, invoice, items, extra } = req.body;
+  const q = quotation || invoice;
+  const ex = extra || {};
+  const quotationDate = (q && (q.quotation_date || q.invoice_date)) || new Date().toISOString().slice(0,10);
 
   db.beginTransaction(err => {
     if (err) return res.status(500).json(err);
 
-    // 1️⃣ Update customer
     db.query(
-      `UPDATE customers
-       SET customer_name=?, mobile_number=?, email=?, location_city=?
+      `UPDATE customers SET customer_name=?, mobile_number=?, email=?, location_city=?
        WHERE id = (SELECT customer_id FROM quotations WHERE id=?)`,
-      [
-        customer.customer_name,
-        customer.mobile_number,
-        customer.email,
-        customer.location_city,
-        id,
-      ],
+      [customer.customer_name, customer.mobile_number, customer.email, customer.location_city, id],
       err => {
         if (err) return db.rollback(() => res.status(500).json(err));
 
-        // 2️⃣ Update quotation (correct column names)
         db.query(
-          `UPDATE quotations
-           SET quotation_date=?, subtotal=?,total_cgst=?,total_sgst=?, total_tax=?, total_discount=?, grand_total=?
+          `UPDATE quotations SET
+           quotation_date=?, subtotal=?, total_cgst=?, total_sgst=?, total_tax=?, total_discount=?, grand_total=?,
+           from_address_id=?, from_address_custom=?,
+           client_company=?, client_address1=?, client_address2=?, client_city=?, client_state=?, client_pincode=?, client_country=?,
+           tax_type=?, custom_tax=?, exec_name=?, exec_phone=?, exec_email=?,
+           terms_general=?, terms_tax=?, terms_project_period=?, terms_validity=?, terms_separate_orders=?,
+           terms_payment=?, terms_payment_custom=?, terms_warranty=?
            WHERE id=?`,
           [
-            quotation.quotation_date,
-            quotation.subtotal,
-            quotation.total_cgst,
-            quotation.total_sgst,
-            quotation.total_cgst + quotation.total_sgst,
-            quotation.total_discount,
-            quotation.grand_total,
-            id,
+            quotationDate, q.subtotal || 0, q.total_cgst || 0, q.total_sgst || 0,
+            (q.total_cgst || 0) + (q.total_sgst || 0), q.total_discount || 0, q.grand_total || 0,
+            ex.from_address_id || null, ex.from_address_custom || null,
+            ex.client_company || null, ex.client_address1 || null, ex.client_address2 || null,
+            ex.client_city || null, ex.client_state || null, ex.client_pincode || null, ex.client_country || "India",
+            ex.tax_type || "GST18", ex.custom_tax || null,
+            ex.exec_name || null, ex.exec_phone || null, ex.exec_email || null,
+            ex.terms_general ? 1 : 0, ex.terms_tax ? 1 : 0, ex.terms_project_period || null,
+            ex.terms_validity ? 1 : 0, ex.terms_separate_orders ? JSON.stringify(ex.terms_separate_orders) : null,
+            ex.terms_payment || null, ex.terms_payment_custom || null, ex.terms_warranty || null,
+            id
           ],
           err => {
             if (err) return db.rollback(() => res.status(500).json(err));
 
-            // 3️⃣ Delete old items
-            db.query(
-              `DELETE FROM quotation_items WHERE quotation_id=?`,
-              [id],
-              err => {
-                if (err) return db.rollback(() => res.status(500).json(err));
+            db.query(`DELETE FROM quotation_items WHERE quotation_id=?`, [id], err => {
+              if (err) return db.rollback(() => res.status(500).json(err));
 
-                // 4️⃣ Insert new items
-                const values = items.map((item, index) => [
-                  id,
-                  index + 1,
-                  item.description,
-                  item.price,
-                  item.quantity,
-                  item.tax,
-                  item.discount,
-                  item.subtotal,
-                ]);
+              const values = items.map((item, index) => [
+                id, index + 1, item.description, item.brand_model || null, item.uom || "Nos",
+                item.price, item.quantity, item.tax, item.discount, item.subtotal,
+              ]);
 
-                db.query(
-                  `INSERT INTO quotation_items
-                   (quotation_id, product_number, description, price, quantity, tax, discount, subtotal)
-                   VALUES ?`,
-                  [values],
-                  err => {
-                    if (err)
-                      return db.rollback(() => res.status(500).json(err));
-
-                    db.commit(err => {
-                      if (err)
-                        return db.rollback(() =>
-                          res.status(500).json(err)
-                        );
-
-                      res.json({ message: "Quotation updated successfully" });
-                    });
-                  }
-                );
-              }
-            );
+              db.query(
+                `INSERT INTO quotation_items (quotation_id, product_number, description, brand_model, uom, price, quantity, tax, discount, subtotal) VALUES ?`,
+                [values],
+                err => {
+                  if (err) return db.rollback(() => res.status(500).json(err));
+                  db.commit(err => {
+                    if (err) return db.rollback(() => res.status(500).json(err));
+                    res.json({ message: "Quotation updated successfully" });
+                  });
+                }
+              );
+            });
           }
         );
       }
