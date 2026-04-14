@@ -267,6 +267,7 @@ const ServiceEstimation = () => {
       </div>
 
       {/* Table */}
+      {!viewId && (
       <div className="bg-white shadow-sm rounded-xl mt-6 overflow-hidden border border-gray-100 overflow-x-auto">
         <table className="w-full text-sm text-center border-collapse min-w-[600px]">
           <thead className="bg-[#f8fafc]">
@@ -297,6 +298,7 @@ const ServiceEstimation = () => {
           </tbody>
         </table>
       </div>
+      )}
 
       {/* Create/Edit Form Modal */}
       <div className={`overlay ${open ? "show" : ""} flex justify-center items-start overflow-y-auto pt-6 pb-10`}>

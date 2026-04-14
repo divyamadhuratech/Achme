@@ -246,8 +246,8 @@ const EstimateInvoice = () => {
       {/* Header */}
       <div className="invoice-heading-tab flex gap-4 justify-between items-center flex-wrap">
         <div>
-          <h2 className="text-2xl font-bold text-[#1694CE]">Estimate Invoice</h2>
-          <nav className="text-sm text-gray-500">Dashboard &gt; Finance &gt; Estimate Invoice</nav>
+          <h2 className="text-2xl font-bold text-[#1694CE]">Estimation</h2>
+          <nav className="text-sm text-gray-500">Dashboard &gt; Finance &gt; Estimation</nav>
         </div>
         <div className="flex gap-3 flex-wrap">
           <div className="flex items-center gap-3 bg-gray-100 px-3 py-1 rounded-lg border h-10 mt-2">
@@ -267,6 +267,7 @@ const EstimateInvoice = () => {
       </div>
 
       {/* Table */}
+      {!viewId && (
       <div className="bg-white shadow-sm rounded-xl mt-6 overflow-hidden border border-gray-100 overflow-x-auto">
         <table className="w-full text-sm text-center border-collapse min-w-[600px]">
           <thead className="bg-[#f8fafc]">
@@ -297,12 +298,13 @@ const EstimateInvoice = () => {
           </tbody>
         </table>
       </div>
+      )}
 
       {/* Create/Edit Form Modal */}
       <div className={`overlay ${open ? "show" : ""} flex justify-center items-start overflow-y-auto pt-6 pb-10`}>
         <div className="bg-white rounded-xl shadow-2xl w-[95%] max-w-5xl p-8 relative">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold text-gray-800">{editId ? "Edit Estimate Invoice" : "Create Estimate Invoice"}</h2>
+            <h2 className="text-2xl font-bold text-gray-800">{editId ? "Edit Estimation" : "Create Estimation"}</h2>
             <X className="cursor-pointer text-gray-400 hover:text-red-500" onClick={() => { setOpen(false); resetForm(); }} />
           </div>
 
@@ -619,7 +621,7 @@ const EstimateInvoice = () => {
       <div className={`overlay ${mailOpen ? "show" : ""} flex justify-center items-center`}>
         <div className="bg-white rounded-xl shadow-2xl w-[90%] max-w-lg p-8 relative">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Mail size={20} /> Send Estimate Invoice</h2>
+            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Mail size={20} /> Send Estimation</h2>
             <X className="cursor-pointer text-gray-400 hover:text-red-500" onClick={() => setMailOpen(false)} />
           </div>
           <div className="space-y-4">

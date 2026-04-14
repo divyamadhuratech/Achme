@@ -64,7 +64,7 @@ function createUnifiedRouter({ table, itemsTable, prefix, dateField, label }) {
              t.terms_separate_orders, t.terms_payment, t.terms_payment_custom, t.terms_warranty,
              c.customer_name, c.mobile_number, c.email, c.location_city,
              i.product_number, i.description, i.brand_model, i.uom,
-             i.price, i.quantity, i.subtotal AS item_subtotal
+             i.price, i.quantity, i.tax, i.discount, i.subtotal AS item_subtotal
       FROM ${table} t
       JOIN customers c ON c.id = t.customer_id
       JOIN ${itemsTable} i ON i.invoice_id = t.id
@@ -252,14 +252,14 @@ function createUnifiedRouter({ table, itemsTable, prefix, dateField, label }) {
             auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
           });
           await transporter.sendMail({
-            from: `"Madhura Team" <${process.env.EMAIL_USER}>`,
+            from: `"Achme Communication" <${process.env.EMAIL_USER}>`,
             to: recipientEmail,
             subject: subject || `${label} ${docNumber}`,
             html: `<div style="font-family:Arial,sans-serif;padding:24px;max-width:600px;margin:0 auto;">
               <p>Dear Customer,</p>
               <p>Please find your <strong>${label} ${docNumber}</strong> attached.</p>
               <p>Thank you for your business.</p>
-              <p>Regards,<br/><strong>Madhura Technologies</strong></p>
+              <p>Regards,<br/><strong>Achme Communication</strong></p>
             </div>`,
             attachments: [{ filename: `${label.replace(/ /g,"_")}_${docNumber}.pdf`, content: pdfBuffer, contentType: "application/pdf" }],
           });

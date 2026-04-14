@@ -41,7 +41,7 @@ router.get("/:id", (req, res) => {
       p.terms_general, p.terms_tax, p.terms_project_period, p.terms_validity, p.terms_separate_orders,
       p.terms_payment, p.terms_payment_custom, p.terms_warranty,
       c.customer_name, c.mobile_number, c.email, c.location_city,
-      pi.product_number, pi.description, pi.price, pi.quantity, pi.subtotal AS item_subtotal,
+      pi.product_number, pi.description, pi.price, pi.quantity, pi.tax, pi.discount, pi.subtotal AS item_subtotal,
       pi.brand_model, pi.uom
     FROM performainvoices p
     JOIN customers c ON c.id = p.customer_id
@@ -308,14 +308,14 @@ router.post("/send-email/:id", (req, res) => {
         });
 
         await transporter.sendMail({
-          from: `"Madhura Team" <${process.env.EMAIL_USER}>`,
+          from: `"Achme Communication" <${process.env.EMAIL_USER}>`,
           to: recipientEmail,
           subject: subject || `Proforma Invoice ${piNumber}`,
           html: `<div style="font-family:Arial,sans-serif;padding:24px;max-width:600px;margin:0 auto;">
             <p style="font-size:16px;color:#1e293b;">Dear Customer,</p>
             <p style="font-size:14px;color:#374151;margin-top:12px;">Please find your <strong>Proforma Invoice ${piNumber}</strong> attached to this email.</p>
             <p style="font-size:14px;color:#374151;margin-top:8px;">Thank you for your business.</p>
-            <p style="font-size:14px;color:#374151;margin-top:16px;">Regards,<br/><strong>Madhura Technologies</strong></p>
+            <p style="font-size:14px;color:#374151;margin-top:16px;">Regards,<br/><strong>Achme Communication</strong></p>
           </div>`,
           attachments: [
             {

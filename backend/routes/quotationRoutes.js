@@ -58,7 +58,7 @@ router.get("/:id", (req, res) => {
       q.terms_separate_orders, q.terms_payment, q.terms_payment_custom, q.terms_warranty,
       c.customer_name, c.mobile_number, c.email, c.location_city,
       qi.product_number, qi.description, qi.brand_model, qi.uom,
-      qi.price, qi.quantity, qi.subtotal AS item_subtotal
+      qi.price, qi.quantity, qi.tax, qi.discount, qi.subtotal AS item_subtotal
     FROM quotations q
     JOIN customers c ON c.id = q.customer_id
     JOIN quotation_items qi ON qi.quotation_id = q.id
@@ -347,14 +347,14 @@ router.post("/send-email/:id", (req, res) => {
         });
 
         await transporter.sendMail({
-          from: `"Madhura Team" <${process.env.EMAIL_USER}>`,
+          from: `"Achme Communication" <${process.env.EMAIL_USER}>`,
           to: recipientEmail,
           subject: subject || `Quotation ${qtNumber}`,
           html: `<div style="font-family:Arial,sans-serif;padding:24px;max-width:600px;margin:0 auto;">
             <p style="font-size:16px;color:#1e293b;">Dear Customer,</p>
             <p style="font-size:14px;color:#374151;margin-top:12px;">Please find your <strong>Quotation ${qtNumber}</strong> attached to this email.</p>
             <p style="font-size:14px;color:#374151;margin-top:8px;">Thank you for your business.</p>
-            <p style="font-size:14px;color:#374151;margin-top:16px;">Regards,<br/><strong>Madhura Technologies</strong></p>
+            <p style="font-size:14px;color:#374151;margin-top:16px;">Regards,<br/><strong>Achme Communication</strong></p>
           </div>`,
           attachments: [
             {

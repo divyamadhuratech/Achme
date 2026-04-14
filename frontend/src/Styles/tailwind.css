@@ -162,7 +162,7 @@ body.modal-open {
 }
 
 .invoicewrapper.See {
-  max-height: 2000px;
+  max-height: 8000px;
   opacity: 1;
   transform: translateY(0);
 }

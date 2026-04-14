@@ -179,7 +179,7 @@ const Proposal = () => {
     if (!selectedId) return alert("Select an invoice to send");
     const inv = quotationDataList.find(p => p.id === selectedId);
     setMailTo(inv?.email || "");
-    setMailSubject(`Quotation ${formatQTNumber(selectedId, inv?.quotation_date || inv?.invoice_date)}`);
+    setMailSubject(`Proposal ${formatQTNumber(selectedId, inv?.quotation_date || inv?.invoice_date)}`);
     setMailOpen(true);
   };
 
@@ -226,8 +226,8 @@ const Proposal = () => {
       {/* Header */}
       <div className="invoice-heading-tab flex gap-4 justify-between items-center flex-wrap">
         <div>
-          <h2 className="text-2xl font-bold text-[#1694CE]">Quotation</h2>
-          <nav className="text-sm text-gray-500">Dashboard &gt; Finance &gt; Quotation</nav>
+          <h2 className="text-2xl font-bold text-[#1694CE]">Proposal</h2>
+          <nav className="text-sm text-gray-500">Dashboard &gt; Finance &gt; Proposal</nav>
         </div>
         <div className="flex gap-3 flex-wrap">
           <div className="flex items-center gap-3 bg-gray-100 px-3 py-1 rounded-lg border h-10 mt-2">
@@ -235,7 +235,7 @@ const Proposal = () => {
             <input type="text" placeholder="Search by customer..." className="outline-none text-sm w-40 bg-transparent" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           </div>
           <div className="flex items-center gap-2 mt-2">
-            <button onClick={() => { if (invoiceRef.current) { html2pdf().from(invoiceRef.current).set({ margin: 10, filename: `Quotation_${viewId}.pdf`, image: { type: "jpeg", quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: "mm", format: "a4", orientation: "portrait" } }).save(); } }} title="Download PDF" className="w-10 h-10 bg-white border rounded-lg shadow-sm flex justify-center items-center hover:bg-gray-50 transition"><Download size={20} /></button>
+            <button onClick={() => { if (invoiceRef.current) { html2pdf().from(invoiceRef.current).set({ margin: 10, filename: `Proposal_${viewId}.pdf`, image: { type: "jpeg", quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: "mm", format: "a4", orientation: "portrait" } }).save(); } }} title="Download PDF" className="w-10 h-10 bg-white border rounded-lg shadow-sm flex justify-center items-center hover:bg-gray-50 transition"><Download size={20} /></button>
             <button onClick={openMailModal} title="Send Email" className="w-10 h-10 bg-white border rounded-lg shadow-sm flex justify-center items-center hover:bg-gray-50 transition"><Mail size={18} /></button>
             <button onClick={() => { if (!selectedId) return alert("Select an item"); handleEdit(selectedId); }} title="Edit" className="w-10 h-10 bg-white border rounded-lg shadow-sm flex justify-center items-center hover:bg-gray-50 transition"><Edit2 size={18} /></button>
             <button onClick={handleDelete} title="Delete" className="w-10 h-10 bg-white border rounded-lg shadow-sm flex justify-center items-center hover:bg-gray-50 transition"><Trash2 size={18} className="text-red-500" /></button>
@@ -247,6 +247,7 @@ const Proposal = () => {
       </div>
 
       {/* Table */}
+      {!viewId && (
       <div className="bg-white shadow-sm rounded-xl mt-6 overflow-hidden border border-gray-100 overflow-x-auto">
         <table className="w-full text-sm text-center border-collapse min-w-[600px]">
           <thead className="bg-[#f8fafc]">
@@ -277,12 +278,13 @@ const Proposal = () => {
           </tbody>
         </table>
       </div>
+      )}
 
       {/* Create/Edit Form Modal */}
       <div className={`overlay ${open ? "show" : ""} flex justify-center items-start overflow-y-auto pt-6 pb-10`}>
         <div className="bg-white rounded-xl shadow-2xl w-[95%] max-w-5xl p-8 relative">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold text-gray-800">{editId ? "Edit Quotation" : "Create Quotation"}</h2>
+            <h2 className="text-2xl font-bold text-gray-800">{editId ? "Edit Proposal" : "Create Proposal"}</h2>
             <X className="cursor-pointer text-gray-400 hover:text-red-500" onClick={() => { setOpen(false); resetForm(); }} />
           </div>
 
@@ -590,7 +592,7 @@ const Proposal = () => {
       <div className={`overlay ${mailOpen ? "show" : ""} flex justify-center items-center`}>
         <div className="bg-white rounded-xl shadow-2xl w-[90%] max-w-lg p-8 relative">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Mail size={20} /> Send Quotation</h2>
+            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><Mail size={20} /> Send Proposal</h2>
             <X className="cursor-pointer text-gray-400 hover:text-red-500" onClick={() => setMailOpen(false)} />
           </div>
           <div className="space-y-4">
