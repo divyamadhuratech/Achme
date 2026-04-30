@@ -38,8 +38,6 @@ const Sidebar = ({ onNavigate }) => {
     },
 
     { icon: <ShoppingCart size={20} />, title: "Sales", subitems: [
-      { label: "Invoice", path: "/dashboard/invoice" },
-      { label: "Payments", path: "/dashboard/payments" },
       { label: "Estimation", path: "/dashboard/estimateinvoice" },
       { label: "Proforma Invoice", path: "/dashboard/performainvoice" },
     ] },
@@ -51,6 +49,7 @@ const Sidebar = ({ onNavigate }) => {
       subitems: [
         { label: "Products", path: "/dashboard/products" },
         { label: "Service Estimation", path: "/dashboard/serviceestimation" },
+        { label: "Call Report", path: "/dashboard/call-report" },
       ]
     },
     { icon: <Briefcase size={20} />, title: "Contracts",

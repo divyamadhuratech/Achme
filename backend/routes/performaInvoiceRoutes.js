@@ -11,7 +11,7 @@ router.get("/", (req, res) => {
       p.grand_total,
       c.customer_name,
       c.mobile_number,
-      c.location_city,
+      COALESCE(p.client_city, c.location_city) AS location_city,
       c.email,
       MIN(pi.description) AS description
     FROM performainvoices p
@@ -32,7 +32,7 @@ router.get("/:id", (req, res) => {
   const sql = `
     SELECT 
       p.id AS performainvoice_id,
-      p.invoice_date, p.subtotal, p.total_tax, p.total_cgst, p.total_sgst, p.total_discount, p.grand_total,
+      p.invoice_date, p.subtotal, p.total_tax, p.total_cgst, p.total_sgst, p.total_igst, p.total_discount, p.grand_total,
       p.reference_no, p.from_address_id, p.from_address_custom,
       COALESCE(p.from_address_custom, fa.address) AS resolved_from_address,
       p.client_company, p.client_address1, p.client_address2, p.client_city, p.client_state, p.client_pincode, p.client_country,
@@ -40,9 +40,11 @@ router.get("/:id", (req, res) => {
       p.exec_name, p.exec_phone, p.exec_email,
       p.terms_general, p.terms_tax, p.terms_project_period, p.terms_validity, p.terms_separate_orders,
       p.terms_payment, p.terms_payment_custom, p.terms_warranty,
-      c.customer_name, c.mobile_number, c.email, c.location_city,
+      p.hsn_sac_code, p.supplier_branch,
+      p.bank_details_id, p.bank_company, p.bank_name, p.bank_account, p.bank_ifsc, p.bank_branch, p.custom_terms,
+      c.customer_name, c.mobile_number, c.email, c.gst_number, c.location_city,
       pi.product_number, pi.description, pi.price, pi.quantity, pi.tax, pi.discount, pi.subtotal AS item_subtotal,
-      pi.brand_model, pi.uom
+      pi.brand_model, pi.uom, pi.hsn_sac
     FROM performainvoices p
     JOIN customers c ON c.id = p.customer_id
     JOIN performainvoice_items pi ON pi.invoice_id = p.id
@@ -109,8 +111,8 @@ router.post("/create", (req, res) => {
     if (err) return res.status(500).json({ message: "Transaction error" });
 
     db.query(
-      `INSERT INTO customers (customer_name, mobile_number, email, location_city) VALUES (?,?,?,?)`,
-      [customer.customer_name, customer.mobile_number, customer.email, customer.location_city],
+      `INSERT INTO customers (customer_name, mobile_number, email, gst_number, location_city) VALUES (?,?,?,?,?)`,
+      [customer.customer_name, customer.mobile_number, customer.email, customer.gst_number || null, customer.location_city],
       (err, customerResult) => {
         if (err) return db.rollback(() => res.status(500).json(err));
 
@@ -119,26 +121,29 @@ router.post("/create", (req, res) => {
 
         db.query(
           `INSERT INTO performainvoices
-           (customer_id, invoice_date, total_cgst, total_sgst, subtotal, total_tax, total_discount, grand_total,
+           (customer_id, invoice_date, total_cgst, total_sgst, total_igst, subtotal, total_tax, total_discount, grand_total,
             reference_no, from_address_id, from_address_custom,
             client_company, client_address1, client_address2, client_city, client_state, client_pincode, client_country,
             tax_type, custom_tax,
             exec_name, exec_phone, exec_email,
             terms_general, terms_tax, terms_project_period, terms_validity, terms_separate_orders,
-            terms_payment, terms_payment_custom, terms_warranty)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            terms_payment, terms_payment_custom, terms_warranty, hsn_sac_code, supplier_branch,
+            bank_details_id, bank_company, bank_name, bank_account, bank_ifsc, bank_branch, custom_terms)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
           [
             customerId, performaInvoice.invoice_date,
-            performaInvoice.total_cgst, performaInvoice.total_sgst, performaInvoice.subtotal,
-            performaInvoice.total_cgst + performaInvoice.total_sgst, performaInvoice.total_discount, performaInvoice.grand_total,
-            refNo, ex.from_address_id || null, ex.from_address_custom || null,
+            performaInvoice.total_cgst || 0, performaInvoice.total_sgst || 0, performaInvoice.total_igst || 0, performaInvoice.subtotal || 0,
+            (performaInvoice.total_cgst || 0) + (performaInvoice.total_sgst || 0) + (performaInvoice.total_igst || 0), performaInvoice.total_discount || 0, performaInvoice.grand_total || 0,
+            refNo, (ex.from_address_id === "" || !ex.from_address_id) ? null : ex.from_address_id, ex.from_address_custom || null,
             ex.client_company || null, ex.client_address1 || null, ex.client_address2 || null,
             ex.client_city || null, ex.client_state || null, ex.client_pincode || null, ex.client_country || "India",
-            ex.tax_type || "GST18", ex.custom_tax || null,
+            ex.tax_type || "GST18", (ex.custom_tax === "" || !ex.custom_tax) ? null : ex.custom_tax,
             ex.exec_name || null, ex.exec_phone || null, ex.exec_email || null,
             ex.terms_general ? 1 : 0, ex.terms_tax ? 1 : 0, ex.terms_project_period || null,
-            ex.terms_validity ? 1 : 0, ex.terms_separate_orders ? JSON.stringify(ex.terms_separate_orders) : null,
+            ex.terms_validity || ex.terms_validity_days || null, ex.terms_separate_orders ? JSON.stringify(ex.terms_separate_orders) : null,
             ex.terms_payment || null, ex.terms_payment_custom || null, ex.terms_warranty || null,
+            ex.hsn_sac_code || null, ex.supplier_branch || null,
+            ex.bank_details_id || null, ex.bank_company || null, ex.bank_name || null, ex.bank_account || null, ex.bank_ifsc || null, ex.bank_branch || null, ex.custom_terms || null,
           ],
           (err, result) => {
             if (err) return db.rollback(() => res.status(500).json(err));
@@ -146,12 +151,12 @@ router.post("/create", (req, res) => {
             const invoiceId = result.insertId;
             const values = items.map((item, index) => [
               invoiceId, index + 1, item.description, item.price, item.quantity, item.tax, item.discount, item.subtotal,
-              item.brand_model || null, item.uom || "Nos"
+              item.brand_model || null, item.hsn_sac || null, item.uom || "Nos"
             ]);
 
             db.query(
               `INSERT INTO performainvoice_items
-               (invoice_id, product_number, description, price, quantity, tax, discount, subtotal, brand_model, uom)
+               (invoice_id, product_number, description, price, quantity, tax, discount, subtotal, brand_model, hsn_sac, uom)
                VALUES ?`,
               [values],
               err => {
@@ -182,25 +187,28 @@ router.put("/:id", (req, res) => {
     if (err) return res.status(500).json(err);
 
     db.query(
-      `UPDATE customers SET customer_name=?, mobile_number=?, email=?, location_city=?
+      `UPDATE customers SET customer_name=?, mobile_number=?, email=?, gst_number=?, location_city=?
        WHERE id = (SELECT customer_id FROM performainvoices WHERE id=?)`,
-      [customer.customer_name, customer.mobile_number, customer.email, customer.location_city, id],
+      [customer.customer_name, customer.mobile_number, customer.email, customer.gst_number || null, customer.location_city, id],
       err => {
         if (err) return db.rollback(() => res.status(500).json(err));
 
         db.query(
           `UPDATE performainvoices SET
-           invoice_date=?, subtotal=?, total_cgst=?, total_sgst=?, total_tax=?, total_discount=?, grand_total=?,
+           invoice_date=?, subtotal=?, total_cgst=?, total_sgst=?, total_igst=?, total_tax=?, total_discount=?, grand_total=?,
            from_address_id=?, from_address_custom=?,
            client_company=?, client_address1=?, client_address2=?, client_city=?, client_state=?, client_pincode=?, client_country=?,
            tax_type=?, custom_tax=?,
            exec_name=?, exec_phone=?, exec_email=?,
            terms_general=?, terms_tax=?, terms_project_period=?, terms_validity=?, terms_separate_orders=?,
-           terms_payment=?, terms_payment_custom=?, terms_warranty=?
+           terms_payment=?, terms_payment_custom=?, terms_warranty=?,
+           hsn_sac_code=?, supplier_branch=?,
+           bank_details_id=?, bank_company=?, bank_name=?, bank_account=?, bank_ifsc=?, bank_branch=?, custom_terms=?
            WHERE id=?`,
           [
-            performaInvoice.invoice_date, performaInvoice.subtotal, performaInvoice.total_cgst,
-            performaInvoice.total_sgst, performaInvoice.total_cgst + performaInvoice.total_sgst,
+            performaInvoice.invoice_date, performaInvoice.subtotal, performaInvoice.total_cgst || 0,
+            performaInvoice.total_sgst || 0, performaInvoice.total_igst || 0,
+            (performaInvoice.total_cgst || 0) + (performaInvoice.total_sgst || 0) + (performaInvoice.total_igst || 0),
             performaInvoice.total_discount, performaInvoice.grand_total,
             ex.from_address_id || null, ex.from_address_custom || null,
             ex.client_company || null, ex.client_address1 || null, ex.client_address2 || null,
@@ -208,8 +216,10 @@ router.put("/:id", (req, res) => {
             ex.tax_type || "GST18", ex.custom_tax || null,
             ex.exec_name || null, ex.exec_phone || null, ex.exec_email || null,
             ex.terms_general ? 1 : 0, ex.terms_tax ? 1 : 0, ex.terms_project_period || null,
-            ex.terms_validity ? 1 : 0, ex.terms_separate_orders ? JSON.stringify(ex.terms_separate_orders) : null,
+            ex.terms_validity || ex.terms_validity_days || null, ex.terms_separate_orders ? JSON.stringify(ex.terms_separate_orders) : null,
             ex.terms_payment || null, ex.terms_payment_custom || null, ex.terms_warranty || null,
+            ex.hsn_sac_code || null, ex.supplier_branch || null,
+            ex.bank_details_id || null, ex.bank_company || null, ex.bank_name || null, ex.bank_account || null, ex.bank_ifsc || null, ex.bank_branch || null, ex.custom_terms || null,
             id
           ],
           err => {
@@ -220,12 +230,12 @@ router.put("/:id", (req, res) => {
 
               const values = items.map((item, index) => [
                 id, index + 1, item.description, item.price, item.quantity, item.tax, item.discount, item.subtotal,
-                item.brand_model || null, item.uom || "Nos"
+                item.brand_model || null, item.hsn_sac || null, item.uom || "Nos"
               ]);
 
               db.query(
                 `INSERT INTO performainvoice_items
-                 (invoice_id, product_number, description, price, quantity, tax, discount, subtotal, brand_model, uom)
+                 (invoice_id, product_number, description, price, quantity, tax, discount, subtotal, brand_model, hsn_sac, uom)
                  VALUES ?`,
                 [values],
                 err => {
@@ -275,13 +285,14 @@ router.post("/send-email/:id", (req, res) => {
 
   const headerSql = `
     SELECT p.*, c.email, c.customer_name, c.mobile_number, c.location_city,
-           p.grand_total, p.invoice_date, p.subtotal, p.total_cgst, p.total_sgst, p.total_discount
+           COALESCE(p.from_address_custom, fa.address) AS resolved_from_address
     FROM performainvoices p
     JOIN customers c ON p.customer_id = c.id
+    LEFT JOIN pi_from_addresses fa ON fa.id = p.from_address_id
     WHERE p.id = ?`;
 
   const itemsSql = `
-    SELECT product_number, description, price, quantity, subtotal
+    SELECT product_number, description, brand_model, hsn_sac, uom, price, quantity, tax, discount, subtotal
     FROM performainvoice_items WHERE invoice_id = ? ORDER BY product_number`;
 
   db.query(headerSql, [id], (err, headerRows) => {

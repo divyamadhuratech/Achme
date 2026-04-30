@@ -104,7 +104,7 @@ export default function InvoiceFormModal({
                 {clientDropdown.map(c => (
                   <div key={c.id} onClick={() => handleSelectClient(c)} className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm border-b last:border-0">
                     <span className="font-semibold">{c.company_name || c.name}</span>
-                    {c.phone && <span className="text-gray-400 ml-2 text-xs">&#128222; {c.phone}</span>}
+                    {c.phone && <span className="text-black ml-2 text-xs font-semibold">Ph: {c.phone}</span>}
                   </div>
                 ))}
               </div>

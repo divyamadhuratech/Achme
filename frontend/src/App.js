@@ -23,6 +23,7 @@ import Payments from "./pages/payment";
 import Estimate  from "./pages/estimate";
 import EstimateInvoice from "./pages/estimateinvoice";
 import ServiceEstimation from "./pages/serviceestimation";
+import CallReport from "./pages/callreport";
 import Contracts from "./pages/contract";
 import Team from "./pages/teammember";
 import Products from "./pages/products";
@@ -30,6 +31,7 @@ import FollowupList from "./components/followuplist";
 import Clients from "./pages/clients";
 import PerformaInvoice from "./pages/performainvoice";
 import Reports from "./pages/reports";
+import InvoicePreview from "./pages/invoicepreview";
 
 export default function App() {
   return (
@@ -40,6 +42,9 @@ export default function App() {
           <Route path="/" element={<Navigate to="/login" />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+
+          {/* PDF PREVIEW — no auth, no layout, used by Puppeteer */}
+          <Route path="/invoice-preview/:type/:id" element={<InvoicePreview />} />
 
           {/* PROTECTED */}
           <Route path="/dashboard" element={<DashboardLayout />}>
@@ -61,6 +66,7 @@ export default function App() {
            <Route path="performainvoice" element={<PerformaInvoice />} />
            <Route path="estimateinvoice" element={<EstimateInvoice />} />
            <Route path="serviceestimation" element={<ServiceEstimation />} />
+           <Route path="call-report" element={<CallReport />} />
            <Route path="reports" element={<Reports />} />
            
           </Route>

@@ -6,7 +6,6 @@
   import Galaxy from "../components/galaxy";
   import { useMemo } from "react";
 
-
   export default function Login() {
     const { login } = useAuth();
     const navigate = useNavigate();

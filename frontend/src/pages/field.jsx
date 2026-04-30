@@ -31,8 +31,8 @@ const Fields = () =>{
     followup_notes: "",
     reminder_required: "Default",
     reminder_date: new Date().toISOString().slice(0, 10),
-    reminder_notes: "",
     reference: "",
+    email: "",
 });
 
 // fetch all data;
@@ -121,6 +121,8 @@ const openEdit = async (id) => {
         : "",
       reminder_notes: data.reminder_notes || "",
       reference: data.reference || "",
+      email: data.email || "",
+      gst_number: data.gst_number || "",
     });
 
     setEditId(id);
@@ -185,7 +187,7 @@ useEffect(() => {
 
           <div className="mt-2">
             <button
-              onClick={() => { setIsEdit(false); setForm({customer_name: "", mobile_number: "", location_city: "", visit_date: new Date().toISOString().slice(0, 10), purpose: "", staff_name: "", field_outcome: "New", followup_required: "Default", followup_date: new Date().toISOString().slice(0, 10), followup_notes: "", reminder_required: "Default", reminder_date: new Date().toISOString().slice(0, 10), reminder_notes: "", reference: ""}); setOpen(true); }}
+              onClick={() => { setIsEdit(false); setForm({customer_name: "", mobile_number: "", location_city: "", visit_date: new Date().toISOString().slice(0, 10), purpose: "", staff_name: "", field_outcome: "New", followup_required: "Default", followup_date: new Date().toISOString().slice(0, 10), followup_notes: "", reminder_required: "Default", reminder_date: new Date().toISOString().slice(0, 10), reminder_notes: "", reference: "", email: ""}); setOpen(true); }}
               className="bg-[#FF3355] text-white w-12 h-12 rounded-full flex justify-center items-center shadow-lg hover:bg-[#e62848] "
             >
               <Plus size={24} />
@@ -197,7 +199,7 @@ useEffect(() => {
       {/*Forms  */}
          <div className="application-maintab  p-5">
            <div className={`overlay ${open ? "show" : ""} justify-items-center `}>
-           <div  className={`task-application bg-white shadow ml-[70px] w-[65%] mt-10  mb-[50px]   p-10 rounded-lg  ${
+           <div  className={`task-application bg-white shadow ml-[70px] w-[65%] mt-[65px]  mb-[50px]   p-10 rounded-lg  ${
              open ? "show" : ""
             }`}>
               {/*  */}
@@ -234,7 +236,7 @@ useEffect(() => {
 
                  <div className="grid grid-cols-4 items-center gap-6">
                    <label htmlFor=""  className="text-sm text-gray-600 text-left">Field Visit Date</label>
-                   <input type="Date" name="visit_date" value={form.visit_date} onChange={handleChange} className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
+                   <input type="Date" readOnly name="visit_date" value={form.visit_date} onChange={handleChange} className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
                 </div>
 
                 {/*  */}
@@ -253,6 +255,13 @@ useEffect(() => {
                    <label htmlFor="" className="text-sm text-gray-600 text-left">Reference</label>
                    <input type="text" name="reference" value={form.reference} onChange={handleChange} className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
                 </div>
+
+                <div className="grid grid-cols-4 items-center gap-6">
+                   <label htmlFor="" className="text-sm text-gray-600 text-left">Email</label>
+                   <input type="email" name="email" value={form.email} onChange={handleChange} className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
+                </div>
+
+             
   
               {/*Call outcome  */}
                  
@@ -455,6 +464,8 @@ useEffect(() => {
                           <th className=" px-4 py-3 border">Purpose</th>
                            <th className=" px-4 py-3 border">Staff Name</th>
                            <th className=" px-4 py-3 border">Reference</th>
+                          
+                           <th className=" px-4 py-3 border">Outcome Status</th>
                              <th className=" px-4 py-3 border">Actions</th>
                    </tr>
                </thead>
@@ -470,6 +481,8 @@ useEffect(() => {
                     <td className="px-4 py-3 border">{f.purpose}</td>
                     <td className="px-4 py-3 border">{f.staff_name}</td>
                     <td className="px-4 py-3 border">{f.reference}</td>
+                   
+                    <td className="px-4 py-3 border">{f.field_outcome}</td>
                      
                     <td className="px-4 py-3 border">
                     <div className="flex gap-3 justify-center">

@@ -222,12 +222,14 @@ useEffect(() => {
       </div>
 
       <div className="overflow-y-auto ">
-        <div className={`overlay ${open ? "show" : ""} overflow-y-auto  `}>
-          <div
-            className={`task-application bg-white shadow ml-[18%] w-[70%]  mb-[50px] overflow-y-auto p-5 rounded-lg  ${
+        <div className={`${open ? "fixed" : "hidden"} inset-0 bg-black/40 flex items-center justify-center z-50`}>
+        {/* <div className={`overlay ${open ? "show" : ""} overflow-y-auto  `}> */}
+          {/* <div
+            className={`task-application bg-white shadow ml-[18%] w-[70%] mt-[40%]  mb-[50px] overflow-y-auto p-5 rounded-lg  ${
               open ? "show" : ""
             }`}
-          >
+          > */}
+          <div className="bg-white shadow w-[90%] md:w-[70%] max-h-[90vh] overflow-y-auto p-5 rounded-lg">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-semibold mb-8 text-gray-700 mt-[-20px]">
                 Create A New Estimate

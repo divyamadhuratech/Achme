@@ -10,6 +10,34 @@ router.get("/", (req, res) => {
   });
 });
 
+const syncClient = (data) => {
+  const { customer_name, mobile_number, location_city, purpose, email, walkin_status } = data;
+
+  if (walkin_status === "Converted") {
+    db.query(
+      "SELECT * FROM clients WHERE phone = ?",
+      [mobile_number],
+      (err, result) => {
+        if (err) return;
+        if (result.length === 0) {
+          db.query(
+            "INSERT INTO clients (name, phone, address, service, email) VALUES (?, ?, ?, ?, ?)",
+            [customer_name, mobile_number, location_city, purpose, email]
+          );
+        } else {
+          db.query(
+            "UPDATE clients SET name=?, address=?, service=?, email=? WHERE phone=?",
+            [customer_name, location_city, purpose, email, mobile_number]
+          );
+        }
+      }
+    );
+  } else {
+    // If not converted, ensure it's removed from clients if it exists
+    db.query("DELETE FROM clients WHERE phone = ?", [mobile_number]);
+  }
+};
+
 // POST telecall
 router.post("/", (req, res) => {
   const {
@@ -26,7 +54,9 @@ router.post("/", (req, res) => {
     reminder_required,
     reminder_date,
     reminder_notes,
-    reference
+    reference,
+    gst_number,
+    email
   } = req.body;
 
   const sql = `
@@ -44,9 +74,11 @@ router.post("/", (req, res) => {
       reminder_required,
       reminder_date,
       reminder_notes,
-      reference
+      reference,
+      gst_number,
+      email
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
   db.query(
@@ -65,10 +97,13 @@ router.post("/", (req, res) => {
       reminder_required,
       reminder_date,
       reminder_notes,
-      reference
+      reference,
+      gst_number,
+      email
     ],
     (err, result) => {
       if (err) return res.status(500).json({ error: err.message });
+      syncClient(req.body);
       res.json({ message: "Walkins added", id: result.insertId });
     }
   );
@@ -111,7 +146,9 @@ router.put("/:id", (req, res) => {
     reminder_required,
     reminder_date,
     reminder_notes,
-    reference
+    reference,
+    gst_number,
+    email
   } = req.body;
 
   db.query(
@@ -129,7 +166,9 @@ router.put("/:id", (req, res) => {
       reminder_required=?,
       reminder_date=?,
       reminder_notes=?,
-      reference=?
+      reference=?,
+      gst_number=?,
+      email=?
      WHERE id=?`,
     [
       customer_name,
@@ -146,6 +185,8 @@ router.put("/:id", (req, res) => {
       reminder_date,
       reminder_notes,
       reference,
+      gst_number,
+      email,
       req.params.id
     ],
     (err, result) => {
@@ -158,6 +199,7 @@ router.put("/:id", (req, res) => {
         return res.status(404).json({ message: "Walkin not found" });
       }
 
+      syncClient(req.body);
       res.json({ message: "Walkin updated successfully" });
     }
   );

@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS `clients` (
   `address` text DEFAULT NULL,
   `state` varchar(100) DEFAULT NULL,
   `pincode` varchar(20) DEFAULT NULL,
+  `gst_number` varchar(20) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -89,6 +90,7 @@ CREATE TABLE IF NOT EXISTS `fields` (
   `reminder_date` date DEFAULT NULL,
   `reminder_notes` text,
   `reference` varchar(255) DEFAULT NULL,
+  `gst_number` varchar(20) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
@@ -172,6 +174,9 @@ CREATE TABLE IF NOT EXISTS `quotations` (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `total_cgst` decimal(10,2) DEFAULT '0.00',
   `total_sgst` decimal(10,2) DEFAULT '0.00',
+  `total_igst` decimal(10,2) DEFAULT '0.00',
+  `hsn_sac_code` varchar(50) DEFAULT NULL,
+  `supplier_branch` varchar(100) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `customer_id` (`customer_id`),
   CONSTRAINT `quotations_ibfk_1`
@@ -184,6 +189,8 @@ CREATE TABLE IF NOT EXISTS `quotation_items` (
   `product_number` int NOT NULL,
   `description` varchar(255) NOT NULL,
   `price` decimal(10,2) NOT NULL,
+  `brand_model` varchar(150) DEFAULT NULL,
+  `hsn_sac` varchar(20) DEFAULT NULL,
   `quantity` int NOT NULL,
   `tax` decimal(10,2) DEFAULT '0.00',
   `discount` decimal(10,2) DEFAULT '0.00',
@@ -255,6 +262,7 @@ CREATE TABLE IF NOT EXISTS `telecalls` (
   `reminder_date` date DEFAULT NULL,
   `reminder_notes` text,
   `reference` varchar(255) DEFAULT NULL,
+  `gst_number` varchar(20) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -286,6 +294,7 @@ CREATE TABLE IF NOT EXISTS `walkins` (
   `reminder_date` date DEFAULT NULL,
   `reminder_notes` text,
   `reference` varchar(255) DEFAULT NULL,
+  `gst_number` varchar(20) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -301,6 +310,9 @@ CREATE TABLE IF NOT EXISTS `performainvoices` (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `total_cgst` decimal(10,2) DEFAULT '0.00',
   `total_sgst` decimal(10,2) DEFAULT '0.00',
+  `total_igst` decimal(10,2) DEFAULT '0.00',
+  `hsn_sac_code` varchar(50) DEFAULT NULL,
+  `supplier_branch` varchar(100) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `customer_id` (`customer_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -311,6 +323,8 @@ CREATE TABLE IF NOT EXISTS `performainvoice_items` (
   `product_number` int NOT NULL,
   `description` varchar(255) NOT NULL,
   `price` decimal(10,2) NOT NULL,
+  `brand_model` varchar(150) DEFAULT NULL,
+  `hsn_sac` varchar(20) DEFAULT NULL,
   `quantity` int NOT NULL,
   `tax` decimal(10,2) DEFAULT '0.00',
   `discount` decimal(10,2) DEFAULT '0.00',
@@ -330,6 +344,19 @@ CREATE TABLE IF NOT EXISTS `services` (
   `date` date DEFAULT NULL,
   `images` text,
   `issues` text,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE IF NOT EXISTS `call_reports` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `name` varchar(150) NOT NULL,
+  `location` varchar(150) DEFAULT NULL,
+  `phone` varchar(20) DEFAULT NULL,
+  `complaint` text,
+  `time_spent` varchar(50) DEFAULT NULL,
+  `km` decimal(10,2) DEFAULT NULL,
+  `report_date` date DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

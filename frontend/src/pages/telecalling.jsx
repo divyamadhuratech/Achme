@@ -45,6 +45,7 @@ const formatDate = (date) => {
       reminder_date: new Date().toISOString().slice(0, 10),
        reminder_notes: "",
        reference: "",
+       email: "",
   })
 
   // Background Scroll
@@ -127,6 +128,7 @@ const saveTelecall = async (e) => {
       reminder_date: data.reminder_date || "",
       reminder_notes: data.reminder_notes || "",
       reference: data.reference || "",
+      email: data.email || "",
     });
 
     setEditId(id);
@@ -176,7 +178,7 @@ useEffect(() => {
           </a>
         </div>
 
-        <div className="flex gap-3 ">
+        <div className="flex gap-3">
           <div className="flex items-center gap-3 bg-gray px-2 py-1 rounded-lg  border w-50 h-9 mt-4">
             <Search size={18} className="text-gray-500" />
             <input
@@ -190,7 +192,7 @@ useEffect(() => {
 
           <div className="mt-2">
             <button
-              onClick={() => { setIsEdit(false); setForm({customer_name: "", mobile_number: "", location_city: "", call_date: new Date().toISOString().slice(0, 10), service_name: "", staff_name: "", call_outcome: "New", followup_required: "Default", followup_date: new Date().toISOString().slice(0, 10), followup_notes: "", reminder_required: "Default", reminder_date: new Date().toISOString().slice(0, 10), reminder_notes: "", reference: ""}); setOpen(true); }}
+              onClick={() => { setIsEdit(false); setForm({customer_name: "", mobile_number: "", location_city: "", call_date: new Date().toISOString().slice(0, 10), service_name: "", staff_name: "", call_outcome: "New", followup_required: "Default", followup_date: new Date().toISOString().slice(0, 10), followup_notes: "", reminder_required: "Default", reminder_date: new Date().toISOString().slice(0, 10), reminder_notes: "", reference: "", gst_number: "", email: ""}); setOpen(true); }}
               className="bg-[#FF3355] text-white w-12 h-12 rounded-full flex justify-center items-center shadow-lg hover:bg-[#e62848] "
             >
               <Plus size={24} />
@@ -202,7 +204,7 @@ useEffect(() => {
      {/*Form */}
         <div className="application-maintab  p-5">
            <div className={`overlay ${open ? "show" : ""} justify-items-center pb-[50px]`}>
-           <div  className={`task-application bg-white shadow ml-[50px] mt-20 w-[65%] z-70  p-10 rounded-lg  ${
+           <div  className={`task-application bg-white shadow ml-[50px] mt-[65px] w-[65%] z-70  p-10 rounded-lg  ${
              open ? "show" : ""
             }`}>
               {/*  */}
@@ -218,8 +220,8 @@ useEffect(() => {
 
                 <form  onSubmit={saveTelecall} className=" invoice-form p-6 space-y-6 relative">
                 <div className="grid grid-cols-4 items-center gap-6">
-                   <label htmlFor="" className="text-sm text-gray-600 text-left">Customer Name</label>
-                   <input type="text" value={form.customer_name} onChange={handleChange} name="customer_name" placeholder="e.g. Ravi Kumar" onKeyDown={e => { if (/[0-9]/.test(e.key)) e.preventDefault(); }} className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
+                   <label htmlFor="" className="text-sm text-gray-600 text-left">Customer Name <span className="text-red-600">*</span> </label>
+                   <input type="text" required value={form.customer_name}  onChange={handleChange} name="customer_name" placeholder="e.g. Ravi Kumar" onKeyDown={e => { if (/[0-9]/.test(e.key)) e.preventDefault(); }} className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
                 </div>
 
                 {/*  */}
@@ -239,7 +241,7 @@ useEffect(() => {
 
                  <div className="grid grid-cols-4 items-center gap-6">
                    <label htmlFor=""  className="text-sm text-gray-600 text-left">Call Date</label>
-                   <input type="Date" value={form.call_date} onChange={handleChange} name="call_date" className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
+                   <input type="Date" readOnly value={form.call_date} onChange={handleChange} name="call_date" className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
                 </div>
 
                 {/*  */}
@@ -258,7 +260,13 @@ useEffect(() => {
                    <label htmlFor="" className="text-sm text-gray-600 text-left">Reference</label>
                    <input type="text" value={form.reference} onChange={handleChange} name="reference" className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
                 </div>
-  
+
+                <div className="grid grid-cols-4 items-center gap-6">
+                   <label htmlFor="" className="text-sm text-gray-600 text-left">Email</label>
+                   <input type="email" value={form.email} onChange={handleChange} name="email" className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
+                </div>
+
+            
               {/*Call outcome  */}
                  
                 <div className="grid grid-cols-4 items-center gap-6">
@@ -328,7 +336,7 @@ useEffect(() => {
           {/* DROPDOWN OPTIONS */}
                {followOpen && (
                   <div className="absolute left-0 right-0 bg-white border rounded-md mt-1 shadow-lg z-20">
-                  {["Default","Yes","No"].map((outcome) => (
+                  {["Yes","No"].map((outcome) => (
            <div
              key={outcome}
              onClick={() => {
@@ -350,11 +358,12 @@ useEffect(() => {
    </div>
     <div className="flex items-center gap-4 mt-[25px]">
          <label className="text-sm text-gray-600 w-[110px] whitespace-nowrap">
-           Followup Notes
+           Followup Notes <span className="text-red-500">*</span>
          </label>
 
          <input
            type="text"
+           required
            onChange={handleChange}
            value={form.followup_notes}
            name="followup_notes"
@@ -384,7 +393,7 @@ useEffect(() => {
           {/* DROPDOWN OPTIONS */}
                {remainderDetails && (
                   <div className="absolute left-0 right-0 bg-white border rounded-md mt-1 shadow-lg z-20">
-                  {["Default","Yes","No"].map((outcome) => (
+                  {["Yes","No"].map((outcome) => (
            <div
              key={outcome}
              onClick={() => {
@@ -411,6 +420,7 @@ useEffect(() => {
 
          <input
            type="text"
+       
            onChange={handleChange}
            value={form.reminder_notes}
            name="reminder_notes"
@@ -456,6 +466,8 @@ useEffect(() => {
          <th className="border px-4 py-3">Service</th>
          <th className="border px-4 py-3">Staff</th>
          <th className="border px-4 py-3">Reference</th>
+        
+         <th className="border px-4 py-3">Outcome Status</th>
          <th className="border px-4 py-3 w-[90px] text-center">Actions</th>
        </tr>
      </thead>
@@ -490,6 +502,10 @@ useEffect(() => {
            <td className="border px-4 py-2">
              {T.reference}
            </td>
+           
+            <td className="border px-4 py-2">
+              {T.call_outcome}
+            </td>
            <td className="border px-4 py-2 text-center">
              <div className="flex justify-center gap-2">
                <button

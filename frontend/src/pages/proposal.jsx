@@ -7,13 +7,34 @@ import "../Styles/tailwind.css";
 import Invoice from "../components/invoicetemplate";
 
 const UOM_OPTIONS = ["Nos", "Units", "Pieces", "Boxes", "Sets", "Meters", "Kg", "Liters"];
-const TAX_OPTIONS = [
-  { value: "GST18", label: "GST 18%" },
-  { value: "GST5", label: "GST 5%" },
-  { value: "CUSTOM", label: "Custom GST" },
+const BRANCH_OPTIONS = [
+  { value: "Chennai", label: "Chennai", state: "Tamil Nadu" },
+  { value: "Coimbatore", label: "Coimbatore", state: "Tamil Nadu" },
+  { value: "Bangalore", label: "Bangalore", state: "Karnataka" },
 ];
+const INDIAN_STATES = [
+  "Andaman and Nicobar Islands", "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chandigarh", "Chhattisgarh", "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jammu and Kashmir", "Jharkhand", "Karnataka", "Kerala", "Ladakh", "Lakshadweep", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Puducherry", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal"
+];
+const VALIDITY_OPTIONS = ["2 days", "5 days", "10 days", "15 days", "30 days"];
 const PAYMENT_OPTIONS = ["100% Advance", "Payment Against Delivery", "15 Days", "30 Days", "45 Days", "Custom"];
 const WARRANTY_OPTIONS = ["No Warranty", "Testing Warranty", "1 Month", "3 Months", "6 Months", "12 Months", "24 Months", "36 Months", "OEM Warranty", "Supplier Warranty", "OEM Hardware Warranty", "No Software Warranty"];
+
+const GST_STATE_MAP = {
+  "01": "Jammu and Kashmir", "02": "Himachal Pradesh", "03": "Punjab", "04": "Chandigarh", "05": "Uttarakhand",
+  "06": "Haryana", "07": "Delhi", "08": "Rajasthan", "09": "Uttar Pradesh", "10": "Bihar",
+  "11": "Sikkim", "12": "Arunachal Pradesh", "13": "Nagaland", "14": "Manipur", "15": "Mizoram",
+  "16": "Tripura", "17": "Meghalaya", "18": "Assam", "19": "West Bengal", "20": "Jharkhand",
+  "21": "Odisha", "22": "Chhattisgarh", "23": "Madhya Pradesh", "24": "Gujarat",
+  "25": "Dadra and Nagar Haveli and Daman and Diu", "26": "Dadra and Nagar Haveli and Daman and Diu",
+  "27": "Maharashtra", "29": "Karnataka", "30": "Goa", "31": "Lakshadweep",
+  "32": "Kerala", "33": "Tamil Nadu", "34": "Puducherry", "35": "Andaman and Nicobar Islands",
+  "36": "Telangana", "37": "Andhra Pradesh", "38": "Ladakh"
+};
+
+const BANK_DETAILS = [
+  { id: "1", company: "Achme Communication", bank: "KOTAK MAHINDRA BANK", account: "12345667", ifsc: "34DJFHJDH", branch: "Test, Coimbatore" },
+  { id: "2", company: "Achme Communication", bank: "DUMMY BANK", account: "00000000", ifsc: "DUMMY001", branch: "Dummy Branch" }
+];
 
 const emptyExtra = () => ({
   from_address_id: "", from_address_custom: "",
@@ -23,9 +44,17 @@ const emptyExtra = () => ({
   exec_name: "", exec_phone: "", exec_email: "",
   terms_general: false, terms_tax: false,
   terms_project_period: "30-60 days from Purchase Order date",
-  terms_validity: true,
+  terms_validity: "15 days",
   terms_separate_orders: { material: false, installation: false, usd: false, boq: false },
   terms_payment: "", terms_payment_custom: "", terms_warranty: "",
+  supplier_branch: "Chennai",
+  bank_details_id: "1",
+  bank_company: "Achme Communication",
+  bank_name: "KOTAK MAHINDRA BANK",
+  bank_account: "12345667",
+  bank_ifsc: "34DJFHJDH",
+  bank_branch: "Test, Coimbatore",
+  custom_terms: "",
 });
 
 const Proposal = () => {
@@ -45,11 +74,13 @@ const Proposal = () => {
   const [showAddAddress, setShowAddAddress] = useState(false);
   const [newAddrLabel, setNewAddrLabel] = useState("");
   const [newAddrText, setNewAddrText] = useState("");
+  const [clientSearchResults, setClientSearchResults] = useState([]);
 
-  const [items, setItems] = useState([{ name: "", brand_model: "", uom: "Nos", price: 0, qty: 1, tax: 18, discount: 0 }]);
-  const [customer, setCustomer] = useState({ customer_name: "", mobile_number: "", email: "", location_city: "" });
-  const [quotationData, setQuotationData] = useState({ quotation_date: new Date().toISOString().slice(0, 10) });
+  const [items, setItems] = useState([{ name: "", brand_model: "", hsn_sac: "", uom: "Nos", price: 0, qty: 1, tax: 18, discount: 0 }]);
+  const [customer, setCustomer] = useState({ customer_name: "", mobile_number: "", email: "", gst_number: "", location_city: "" });
+  const [quotationData, setQuotationData] = useState({ quotation_date: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })() });
   const [extra, setExtra] = useState(emptyExtra());
+  const [editingIndex, setEditingIndex] = useState(null);
 
   const invoiceRef = useRef(null);
 
@@ -94,9 +125,9 @@ const Proposal = () => {
     const res = await axios.get(`http://localhost:3000/api/quotations/${id}`);
     const rows = res.data;
     const h = rows[0];
-    setCustomer({ customer_name: h.customer_name, mobile_number: h.mobile_number, email: h.email, location_city: h.location_city });
+    setCustomer({ customer_name: h.customer_name, mobile_number: h.mobile_number, email: h.email, gst_number: h.gst_number || "", location_city: h.location_city });
     setQuotationData({ quotation_date: h.quotation_date?.split("T")[0] || h.invoice_date?.split("T")[0] || "" });
-    const loadedItems = rows.map(r => ({ name: r.description, brand_model: r.brand_model || "", uom: r.uom || "Nos", price: Number(r.price) || 0, qty: Number(r.quantity) || 1, tax: 18, discount: Number(r.discount) || 0 }));
+    const loadedItems = rows.map(r => ({ name: r.description, brand_model: r.brand_model || "", hsn_sac: r.hsn_sac || "", uom: r.uom || "Nos", price: Number(r.price) || 0, qty: Number(r.quantity) || 1, tax: 18, discount: Number(r.discount) || 0 }));
     setItems(loadedItems);
     setDescInput(loadedItems.map(i => i.name).join(", "));
     setExtra({
@@ -108,19 +139,53 @@ const Proposal = () => {
       exec_name: h.exec_name || "", exec_phone: h.exec_phone || "", exec_email: h.exec_email || "",
       terms_general: !!h.terms_general, terms_tax: !!h.terms_tax,
       terms_project_period: h.terms_project_period || "30-60 days from Purchase Order date",
-      terms_validity: h.terms_validity !== 0,
+      terms_validity: h.terms_validity || "15 days",
       terms_separate_orders: h.terms_separate_orders ? JSON.parse(h.terms_separate_orders) : { material: false, installation: false, usd: false, boq: false },
       terms_payment: h.terms_payment || "", terms_payment_custom: h.terms_payment_custom || "",
       terms_warranty: h.terms_warranty || "",
+      supplier_branch: h.supplier_branch || "Chennai",
     });
     setEditId(id);
     setOpen(true);
   };
 
-  const getTaxRate = () => {
-    if (extra.tax_type === "GST5") return 5;
-    if (extra.tax_type === "CUSTOM") return Number(extra.custom_tax) || 0;
-    return 18;
+  const getTaxCalculations = () => {
+    if (extra.terms_tax) {
+      const subtotal = items.reduce((acc, i) => acc + (i.price * (i.qty || i.quantity || 0)), 0);
+      const totalDiscount = items.reduce((acc, i) => acc + (i.discount || 0), 0);
+      const grandTotal = subtotal - totalDiscount;
+      return { subtotal, total_discount: totalDiscount, total_cgst: 0, total_sgst: 0, total_igst: 0, grand_total: grandTotal };
+    }
+    const branchState = (BRANCH_OPTIONS.find(b => b.value === extra.supplier_branch)?.state || "Tamil Nadu").toLowerCase().trim();
+    const clientState = (extra.client_state || "").toLowerCase().trim();
+    const isSameState = branchState === clientState && clientState !== "";
+
+    let totalCGST = 0;
+    let totalSGST = 0;
+    let totalIGST = 0;
+    let subtotal = 0;
+    let totalDiscount = 0;
+
+    items.forEach(item => {
+      const itemSubtotal = item.price * item.qty;
+      const discountAmount = item.discount || 0;
+      const taxableAmount = itemSubtotal - discountAmount;
+      const taxRate = item.tax || 0;
+      const taxAmount = (taxableAmount * taxRate) / 100;
+
+      subtotal += itemSubtotal;
+      totalDiscount += discountAmount;
+
+      if (isSameState) {
+        totalCGST += taxAmount / 2;
+        totalSGST += taxAmount / 2;
+      } else {
+        totalIGST += taxAmount;
+      }
+    });
+
+    const grandTotal = subtotal - totalDiscount + totalCGST + totalSGST + totalIGST;
+    return { subtotal, total_discount: totalDiscount, total_cgst: totalCGST, total_sgst: totalSGST, total_igst: totalIGST, grand_total: grandTotal };
   };
 
   const handleSubmit = async (e) => {
@@ -128,21 +193,19 @@ const Proposal = () => {
     if (!quotationData.quotation_date) return alert("Please select date");
     if (items.some(i => !i.name.trim())) return alert("Description cannot be empty");
     try {
-      const taxRate = getTaxRate();
-      const taxedItems = items.map(i => ({ ...i, tax: taxRate }));
-      const totals = calculateTotals(taxedItems);
+      const totals = getTaxCalculations();
       const payload = {
         customer,
         invoice: {
           invoice_date: quotationData.quotation_date,
           quotation_date: quotationData.quotation_date,
           subtotal: totals.subtotal, total_discount: totals.total_discount,
-          total_cgst: totals.total_cgst, total_sgst: totals.total_sgst,
-          total_tax: totals.total_cgst + totals.total_sgst, grand_total: totals.grand_total,
+          total_cgst: totals.total_cgst, total_sgst: totals.total_sgst, total_igst: totals.total_igst,
+          total_tax: totals.total_cgst + totals.total_sgst + totals.total_igst, grand_total: totals.grand_total,
         },
-        items: taxedItems.map(i => ({
-          description: i.name, brand_model: i.brand_model, uom: i.uom,
-          price: i.price, quantity: i.qty, tax: taxRate, discount: i.discount, subtotal: calculateItemTotal(i),
+        items: items.map(i => ({
+          description: i.name, brand_model: i.brand_model, hsn_sac: i.hsn_sac, uom: i.uom,
+          price: i.price, quantity: i.qty, tax: i.tax, discount: i.discount, subtotal: calculateItemTotal(i),
         })),
         extra,
       };
@@ -157,13 +220,32 @@ const Proposal = () => {
     } catch (err) { console.error(err); alert("Error saving Quotation"); }
   };
 
-  const resetForm = () => {
-    setCustomer({ customer_name: "", mobile_number: "", email: "", location_city: "" });
-    setItems([{ name: "", brand_model: "", uom: "Nos", price: 0, qty: 1, tax: 18, discount: 0 }]);
+  const handleAddItem = () => {
+    if (!descInput.trim()) return;
+    const newItem = { name: descInput, brand_model: "", hsn_sac: "", uom: "Nos", price: 0, qty: 1, tax: 18, discount: 0 };
+    
+    if (editingIndex !== null) {
+      const updated = [...items];
+      updated[editingIndex] = { ...updated[editingIndex], name: descInput };
+      setItems(updated);
+      setEditingIndex(null);
+    } else {
+      setItems(prev => {
+        if (prev.length === 1 && !prev[0].name.trim()) return [newItem];
+        return [...prev, newItem];
+      });
+    }
     setDescInput("");
-    setQuotationData({ quotation_date: new Date().toISOString().slice(0, 10) });
+  };
+
+  const resetForm = () => {
+    setCustomer({ customer_name: "", mobile_number: "", email: "", gst_number: "", location_city: "" });
+    setItems([{ name: "", brand_model: "", hsn_sac: "", uom: "Nos", price: 0, qty: 1, tax: 18, discount: 0 }]);
+    setDescInput("");
+    setQuotationData({ quotation_date: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })() });
     setExtra(emptyExtra());
     setEditId(null);
+    setEditingIndex(null);
   };
 
   const handleDelete = async () => {
@@ -195,13 +277,10 @@ const Proposal = () => {
 
   const handleDescInput = (value) => {
     setDescInput(value);
-    const parts = value.split(",").map(s => s.trim()).filter(s => s.length > 0);
-    if (parts.length === 0) { setItems([{ name: "", brand_model: "", uom: "Nos", price: 0, qty: 1, tax: 18, discount: 0 }]); }
-    else { setItems(prev => parts.map((part, i) => ({ name: part, brand_model: prev[i]?.brand_model || "", uom: prev[i]?.uom || "Nos", price: prev[i]?.price || 0, qty: prev[i]?.qty || 1, tax: 18, discount: prev[i]?.discount || 0 }))); }
   };
 
   const updateItem = (i, field, value) => { const copy = [...items]; copy[i][field] = value; setItems(copy); };
-  const addItem = () => { setItems(p => [...p, { name: "", brand_model: "", uom: "Nos", price: 0, qty: 1, tax: 18, discount: 0 }]); setDescInput(prev => prev ? prev + ", " : ""); };
+  const addItem = () => { setItems(p => [...p, { name: "", brand_model: "", hsn_sac: "", uom: "Nos", price: 0, qty: 1, tax: 18, discount: 0 }]); setDescInput(prev => prev ? prev + ", " : ""); };
   const removeItem = () => { if (items.length <= 1) return; const n = items.slice(0, -1); setItems(n); setDescInput(n.map(i => i.name).join(", ")); };
   const formatDate = (date) => date ? new Date(date).toLocaleString("en-IN", { dateStyle: "medium" }) : "---";
 
@@ -211,7 +290,6 @@ const Proposal = () => {
   }, [open, mailOpen]);
 
   const filteredInvoices = quotationDataList.filter(q => q.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()));
-  const taxRate = getTaxRate();
 
   const SectionTitle = ({ children }) => (
     <div className="flex items-center gap-2 mb-4 mt-6">
@@ -226,8 +304,8 @@ const Proposal = () => {
       {/* Header */}
       <div className="invoice-heading-tab flex gap-4 justify-between items-center flex-wrap">
         <div>
-          <h2 className="text-2xl font-bold text-[#1694CE]">Proposal</h2>
-          <nav className="text-sm text-gray-500">Dashboard &gt; Finance &gt; Proposal</nav>
+          <h2 className="text-2xl font-bold text-[#1694CE]">Quotation</h2>
+          <nav className="text-sm text-gray-500">Dashboard &gt; Finance &gt; Quotation</nav>
         </div>
         <div className="flex gap-3 flex-wrap">
           <div className="flex items-center gap-3 bg-gray-100 px-3 py-1 rounded-lg border h-10 mt-2">
@@ -235,7 +313,7 @@ const Proposal = () => {
             <input type="text" placeholder="Search by customer..." className="outline-none text-sm w-40 bg-transparent" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           </div>
           <div className="flex items-center gap-2 mt-2">
-            <button onClick={() => { if (invoiceRef.current) { html2pdf().from(invoiceRef.current).set({ margin: 10, filename: `Proposal_${viewId}.pdf`, image: { type: "jpeg", quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: "mm", format: "a4", orientation: "portrait" } }).save(); } }} title="Download PDF" className="w-10 h-10 bg-white border rounded-lg shadow-sm flex justify-center items-center hover:bg-gray-50 transition"><Download size={20} /></button>
+            <button onClick={() => { if (invoiceRef.current) { html2pdf().from(invoiceRef.current).set({ margin: 10, filename: `Quotation_${viewId}.pdf`, image: { type: "jpeg", quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: "mm", format: "a4", orientation: "portrait" } }).save(); } }} title="Download PDF" className="w-10 h-10 bg-white border rounded-lg shadow-sm flex justify-center items-center hover:bg-gray-50 transition"><Download size={20} /></button>
             <button onClick={openMailModal} title="Send Email" className="w-10 h-10 bg-white border rounded-lg shadow-sm flex justify-center items-center hover:bg-gray-50 transition"><Mail size={18} /></button>
             <button onClick={() => { if (!selectedId) return alert("Select an item"); handleEdit(selectedId); }} title="Edit" className="w-10 h-10 bg-white border rounded-lg shadow-sm flex justify-center items-center hover:bg-gray-50 transition"><Edit2 size={18} /></button>
             <button onClick={handleDelete} title="Delete" className="w-10 h-10 bg-white border rounded-lg shadow-sm flex justify-center items-center hover:bg-gray-50 transition"><Trash2 size={18} className="text-red-500" /></button>
@@ -284,15 +362,30 @@ const Proposal = () => {
       <div className={`overlay ${open ? "show" : ""} flex justify-center items-start overflow-y-auto pt-6 pb-10`}>
         <div className="bg-white rounded-xl shadow-2xl w-[95%] max-w-5xl p-8 relative">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold text-gray-800">{editId ? "Edit Proposal" : "Create Proposal"}</h2>
+            <h2 className="text-2xl font-bold text-gray-800">{editId ? "Edit Quotation" : "Create Quotation"}</h2>
             <X className="cursor-pointer text-gray-400 hover:text-red-500" onClick={() => { setOpen(false); resetForm(); }} />
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-
-            {/* ── SECTION 1: FROM ADDRESS ── */}
             <SectionTitle>From Address</SectionTitle>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-bold text-gray-500 uppercase">Supplier Branch</label>
+                <select value={extra.supplier_branch} onChange={e => {
+                  const branch = e.target.value;
+                  const matchingAddr = fromAddresses.find(a => a.label.toLowerCase().includes(branch.toLowerCase()));
+                  setExtra(ex => ({ 
+                    ...ex, 
+                    supplier_branch: branch,
+                    from_address_id: matchingAddr ? String(matchingAddr.id) : ex.from_address_id
+                  }));
+                }}
+                  className="border rounded-lg px-3 py-2 outline-none bg-white text-sm">
+                  {BRANCH_OPTIONS.map(b => (
+                    <option key={b.value} value={b.value}>{b.label} ({b.state})</option>
+                  ))}
+                </select>
+              </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-bold text-gray-500 uppercase">Select Office Address</label>
                 <select value={extra.from_address_id} onChange={e => setExtra(ex => ({ ...ex, from_address_id: e.target.value === "ADD_NEW" ? "" : e.target.value, from_address_custom: "" }))}
@@ -314,14 +407,8 @@ const Proposal = () => {
                   </div>
                 )}
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-bold text-gray-500 uppercase">Custom Address (Optional)</label>
-                <textarea value={extra.from_address_custom} onChange={e => setExtra(ex => ({ ...ex, from_address_custom: e.target.value }))}
-                  placeholder="Enter custom address..." className="border rounded-lg px-3 py-2 outline-none text-sm min-h-[70px]" />
-              </div>
             </div>
 
-            {/* Add new address inline */}
             <div className="flex items-center gap-2">
               <button type="button" onClick={() => setShowAddAddress(p => !p)} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
                 <Plus size={12} /> Add New Address to List
@@ -338,12 +425,128 @@ const Proposal = () => {
               </div>
             )}
 
+            {/* Redesigned Bank Details Section inside Company Profile */}
+            <div className="mt-4 p-5 bg-[#f8fafc] border border-slate-200 rounded-2xl shadow-sm">
+              <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
+                <h4 className="text-sm font-black text-blue-800 uppercase tracking-tighter flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 bg-blue-600 rounded-full"></span>
+                  Bank Details
+                </h4>
+                <div className="flex items-center gap-2">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">Template:</label>
+                  <select 
+                    value={extra.bank_details_id} 
+                    onChange={e => {
+                      const b = BANK_DETAILS.find(x => x.id === e.target.value);
+                      if (b) {
+                        setExtra(ex => ({ 
+                          ...ex, 
+                          bank_details_id: b.id,
+                          bank_company: b.company,
+                          bank_name: b.bank,
+                          bank_account: b.account,
+                          bank_ifsc: b.ifsc,
+                          bank_branch: b.branch
+                        }));
+                      }
+                    }}
+                    className="text-[11px] border-none rounded bg-white shadow-sm px-2 py-1 outline-none font-bold text-slate-600 cursor-pointer hover:bg-slate-50"
+                  >
+                    {BANK_DETAILS.map(b => (
+                      <option key={b.id} value={b.id}>{b.bank} - {b.account}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+                <div className="flex items-center border-b border-slate-100 pb-1">
+                  <span className="w-20 text-[11px] font-bold text-slate-500 uppercase">Company</span>
+                  <span className="mr-3 text-slate-300">:</span>
+                  <input type="text" value={extra.bank_company} onChange={e => setExtra(ex => ({ ...ex, bank_company: e.target.value }))} className="flex-1 bg-transparent text-sm font-bold text-slate-800 outline-none" />
+                </div>
+                <div className="flex items-center border-b border-slate-100 pb-1">
+                  <span className="w-20 text-[11px] font-bold text-slate-500 uppercase">Bank</span>
+                  <span className="mr-3 text-slate-300">:</span>
+                  <input type="text" value={extra.bank_name} onChange={e => setExtra(ex => ({ ...ex, bank_name: e.target.value }))} className="flex-1 bg-transparent text-sm font-bold text-slate-800 outline-none" />
+                </div>
+                <div className="flex items-center border-b border-slate-100 pb-1">
+                  <span className="w-20 text-[11px] font-bold text-slate-500 uppercase">Account</span>
+                  <span className="mr-3 text-slate-300">:</span>
+                  <input type="text" value={extra.bank_account} onChange={e => setExtra(ex => ({ ...ex, bank_account: e.target.value }))} className="flex-1 bg-transparent text-sm font-bold text-slate-800 outline-none" />
+                </div>
+                <div className="flex items-center border-b border-slate-100 pb-1">
+                  <span className="w-20 text-[11px] font-bold text-slate-500 uppercase">IFSC</span>
+                  <span className="mr-3 text-slate-300">:</span>
+                  <input type="text" value={extra.bank_ifsc} onChange={e => setExtra(ex => ({ ...ex, bank_ifsc: e.target.value }))} className="flex-1 bg-transparent text-sm font-bold text-slate-800 outline-none uppercase" />
+                </div>
+                <div className="flex items-center border-b border-slate-100 pb-1 md:col-span-2">
+                  <span className="w-20 text-[11px] font-bold text-slate-500 uppercase">Branch</span>
+                  <span className="mr-3 text-slate-300">:</span>
+                  <input type="text" value={extra.bank_branch} onChange={e => setExtra(ex => ({ ...ex, bank_branch: e.target.value }))} className="flex-1 bg-transparent text-sm font-bold text-slate-800 outline-none" />
+                </div>
+              </div>
+            </div>
+
             {/* ── SECTION 2: CLIENT DETAILS (TO ADDRESS) ── */}
             <SectionTitle>Client Details (To Address)</SectionTitle>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-bold text-gray-500 uppercase">Reference No</label>
                 <input type="text" value={editId ? "Auto-generated" : "Will be auto-generated"} readOnly className="border rounded-lg px-3 py-2 outline-none bg-gray-50 text-gray-400 text-sm cursor-not-allowed" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-bold text-gray-500 uppercase">Search Existing Client</label>
+                <div className="relative">
+                  <input type="text" placeholder="Type to search clients..." 
+                    onChange={async (e) => {
+                      const val = e.target.value;
+                      if (val.length > 2) {
+                        try {
+                          const res = await axios.get(`http://localhost:3000/api/client/search?name=${val}`);
+                          setClientSearchResults(res.data);
+                        } catch (err) { console.error(err); }
+                      } else {
+                        setClientSearchResults([]);
+                      }
+                    }}
+                    className="border rounded-lg px-3 py-2 outline-none text-sm w-full" />
+                  {clientSearchResults.length > 0 && (
+                    <div className="absolute left-0 right-0 bg-white border rounded-lg mt-1 shadow-lg z-50 max-h-40 overflow-y-auto">
+                      {clientSearchResults.map(c => (
+                        <div key={c.id} onClick={async () => {
+                          try {
+                            const res = await axios.get("http://localhost:3000/api/client");
+                            const fullClient = res.data.find(cc => cc.id === c.id);
+                            if (fullClient) {
+                              setCustomer({
+                                customer_name: fullClient.name,
+                                mobile_number: fullClient.phone || "",
+                                email: fullClient.email || "",
+                                gst_number: fullClient.gst_number || "",
+                                location_city: fullClient.address || ""
+                              });
+                              setExtra(ex => ({
+                                ...ex,
+                                client_company: fullClient.company_name || "",
+                                client_city: fullClient.address || "",
+                                client_state: fullClient.state || "",
+                                client_pincode: fullClient.pincode || ""
+                              }));
+                              if (fullClient.service) {
+                                setDescInput(fullClient.service);
+                                setItems([{ name: fullClient.service, brand_model: "", hsn_sac: "", uom: "Nos", price: 0, qty: 1, tax: 18, discount: 0 }]);
+                              }
+                            }
+                          } catch (err) { console.error(err); }
+                          setClientSearchResults([]);
+                        }} className="px-3 py-2 cursor-pointer hover:bg-blue-50 text-sm">
+                          {c.name} {c.company_name ? `(${c.company_name})` : ""}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-bold text-gray-500 uppercase">Company Name</label>
@@ -362,6 +565,18 @@ const Proposal = () => {
                 <input type="email" value={customer.email} onChange={e => setCustomer({ ...customer, email: e.target.value })} className="border rounded-lg px-3 py-2 outline-none text-sm" />
               </div>
               <div className="flex flex-col gap-1">
+                <label className="text-xs font-bold text-gray-500 uppercase">GST Number</label>
+                <input type="text" value={customer.gst_number} onChange={e => {
+                  const val = e.target.value.toUpperCase();
+                  setCustomer({ ...customer, gst_number: val });
+                  if (val.length >= 2) {
+                    const stateCode = val.substring(0, 2);
+                    const stateName = GST_STATE_MAP[stateCode];
+                    if (stateName) setExtra(ex => ({ ...ex, client_state: stateName }));
+                  }
+                }} placeholder="33AABCA1234D1Z5" className="border rounded-lg px-3 py-2 outline-none text-sm" />
+              </div>
+              <div className="flex flex-col gap-1">
                 <label className="text-xs font-bold text-gray-500 uppercase">Address Line 1</label>
                 <input type="text" value={extra.client_address1} onChange={e => setExtra(ex => ({ ...ex, client_address1: e.target.value }))} placeholder="Street / Building" className="border rounded-lg px-3 py-2 outline-none text-sm" />
               </div>
@@ -375,7 +590,11 @@ const Proposal = () => {
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-bold text-gray-500 uppercase">State</label>
-                <input type="text" value={extra.client_state} onChange={e => setExtra(ex => ({ ...ex, client_state: e.target.value }))} placeholder="e.g. Tamil Nadu" className="border rounded-lg px-3 py-2 outline-none text-sm" />
+                <select value={extra.client_state} onChange={e => setExtra(ex => ({ ...ex, client_state: e.target.value }))}
+                  className="border rounded-lg px-3 py-2 outline-none text-sm bg-white">
+                  <option value="">-- Select State --</option>
+                  {INDIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-bold text-gray-500 uppercase">PIN Code</label>
@@ -391,29 +610,17 @@ const Proposal = () => {
               </div>
             </div>
 
-            {/* ── SECTION 3: TAX CONFIG ── */}
-            <SectionTitle>Tax Configuration</SectionTitle>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {TAX_OPTIONS.map(opt => (
-                <label key={opt.value} className={`flex items-center gap-3 border rounded-lg px-4 py-3 cursor-pointer transition ${extra.tax_type === opt.value ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-gray-300"}`}>
-                  <input type="radio" name="tax_type" value={opt.value} checked={extra.tax_type === opt.value} onChange={e => setExtra(ex => ({ ...ex, tax_type: e.target.value }))} className="accent-blue-600" />
-                  <span className="text-sm font-medium">{opt.label}</span>
-                </label>
-              ))}
-            </div>
-            {extra.tax_type === "CUSTOM" && (
-              <div className="flex flex-col gap-1 max-w-xs">
-                <label className="text-xs font-bold text-gray-500 uppercase">Custom GST %</label>
-                <input type="number" value={extra.custom_tax} onChange={e => setExtra(ex => ({ ...ex, custom_tax: e.target.value }))} placeholder="e.g. 12" min="0" max="100" className="border rounded-lg px-3 py-2 outline-none text-sm" />
-              </div>
-            )}
-
             {/* ── SECTION 4: ITEMS TABLE ── */}
             <SectionTitle>Quote Items</SectionTitle>
             <div className="flex flex-col gap-1 mb-3">
-              <label className="text-xs font-bold text-gray-500 uppercase">Description (Comma-split)</label>
-              <textarea value={descInput} onChange={e => handleDescInput(e.target.value)} placeholder="e.g. Laptop, Monitor, Keyboard" className="border rounded-lg px-3 py-2 outline-none min-h-[60px] text-sm" />
-              <p className="text-[10px] text-orange-500 italic font-medium">Use commas to split items automatically</p>
+              <label className="text-xs font-bold text-gray-500 uppercase">Description</label>
+              <div className="flex gap-2">
+                <textarea value={descInput} onChange={e => setDescInput(e.target.value)} placeholder="e.g. Laptop, specs..." className="flex-1 border rounded-lg px-3 py-2 outline-none min-h-[60px] text-sm" />
+                <button type="button" onClick={handleAddItem} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold h-fit self-end hover:bg-blue-700 transition">
+                  {editingIndex !== null ? "Update Item" : "Add Item"}
+                </button>
+              </div>
+              <p className="text-[10px] text-orange-500 italic font-medium">Content before the first comma will be bolded in the template</p>
             </div>
             <div className="border rounded-xl overflow-hidden shadow-sm overflow-x-auto">
               <table className="w-full text-center text-sm min-w-[700px]">
@@ -422,6 +629,7 @@ const Proposal = () => {
                     <th className="px-3 py-3 text-left">S.No</th>
                     <th className="px-3 py-3 text-left">Description</th>
                     <th className="px-3 py-3 text-left">Brand & Model</th>
+                    <th className="px-3 py-3 text-left">HSN/SAC</th>
                     <th className="px-3 py-3">UOM</th>
                     <th className="px-3 py-3">Price</th>
                     <th className="px-3 py-3">Qty</th>
@@ -434,8 +642,18 @@ const Proposal = () => {
                   {items.map((item, i) => (
                     <tr key={i} className="border-b last:border-0">
                       <td className="px-3 py-2 text-gray-400 text-xs">{i + 1}</td>
-                      <td className="px-3 py-2"><input type="text" value={item.name} onChange={e => updateItem(i, "name", e.target.value)} className="w-full outline-none bg-transparent text-sm" placeholder="Description" /></td>
+                      <td className="px-3 py-2">
+                        <input 
+                          type="text" 
+                          value={item.name} 
+                          readOnly 
+                          onClick={() => { setDescInput(item.name); setEditingIndex(i); }}
+                          className="w-full outline-none bg-transparent text-sm cursor-pointer hover:text-blue-600 font-medium" 
+                          placeholder="Click to edit description..." 
+                        />
+                      </td>
                       <td className="px-3 py-2"><input type="text" value={item.brand_model} onChange={e => updateItem(i, "brand_model", e.target.value)} className="w-full outline-none bg-transparent text-sm" placeholder="Brand/Model" /></td>
+                      <td className="px-3 py-2"><input type="text" value={item.hsn_sac} onChange={e => updateItem(i, "hsn_sac", e.target.value)} className="w-full outline-none bg-transparent text-sm" placeholder="HSN/SAC" /></td>
                       <td className="px-3 py-2">
                         <select value={item.uom} onChange={e => updateItem(i, "uom", e.target.value)} className="border rounded px-2 py-1 text-xs outline-none bg-white">
                           {UOM_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
@@ -445,15 +663,14 @@ const Proposal = () => {
                       </td>
                       <td className="px-3 py-2"><input type="number" value={item.price} onChange={e => updateItem(i, "price", Number(e.target.value))} className="w-20 text-center outline-none bg-transparent text-sm" /></td>
                       <td className="px-3 py-2"><input type="number" value={item.qty} onChange={e => updateItem(i, "qty", Number(e.target.value))} className="w-12 text-center outline-none bg-transparent text-sm" /></td>
-                      <td className="px-3 py-2"><input type="number" value={taxRate} readOnly className="w-12 text-center text-gray-400 bg-transparent outline-none cursor-not-allowed text-sm" /></td>
+                      <td className="px-3 py-2"><input type="number" value={item.tax} onChange={e => updateItem(i, "tax", Number(e.target.value))} className="w-12 text-center bg-transparent outline-none text-sm border-b border-gray-200" /></td>
                       <td className="px-3 py-2"><input type="number" value={item.discount} onChange={e => updateItem(i, "discount", Number(e.target.value))} className="w-20 text-center outline-none bg-transparent text-sm" /></td>
-                      <td className="px-3 py-2 text-right font-bold text-sm">&#8377;{calculateItemTotal({ ...item, tax: taxRate }).toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right font-bold text-sm">&#8377;{calculateItemTotal(item).toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
               <div className="bg-gray-50 p-3 flex gap-4">
-                <button type="button" onClick={addItem} className="flex items-center gap-2 text-blue-600 font-bold text-xs hover:underline"><PlusCircle size={14} /> Add Line</button>
                 <button type="button" onClick={removeItem} className="flex items-center gap-2 text-red-500 font-bold text-xs hover:underline"><MinusCircle size={14} /> Remove Line</button>
               </div>
             </div>
@@ -462,13 +679,13 @@ const Proposal = () => {
             <div className="flex justify-end pt-2">
               <div className="w-72 space-y-2">
                 {(() => {
-                  const taxedItems = items.map(i => ({ ...i, tax: taxRate }));
-                  const totals = calculateTotals(taxedItems);
+                  const totals = getTaxCalculations();
                   return (<>
                     <div className="flex justify-between text-sm text-gray-600"><span>Subtotal</span><span>&#8377;{totals.subtotal.toLocaleString()}</span></div>
                     <div className="flex justify-between text-sm text-gray-600"><span>Discount</span><span>-&#8377;{totals.total_discount.toLocaleString()}</span></div>
-                    <div className="flex justify-between text-sm text-gray-600"><span>CGST ({taxRate / 2}%)</span><span>&#8377;{totals.total_cgst.toLocaleString()}</span></div>
-                    <div className="flex justify-between text-sm text-gray-600"><span>SGST ({taxRate / 2}%)</span><span>&#8377;{totals.total_sgst.toLocaleString()}</span></div>
+                    {totals.total_cgst > 0 && <div className="flex justify-between text-sm text-gray-600"><span>CGST</span><span>&#8377;{totals.total_cgst.toLocaleString()}</span></div>}
+                    {totals.total_sgst > 0 && <div className="flex justify-between text-sm text-gray-600"><span>SGST</span><span>&#8377;{totals.total_sgst.toLocaleString()}</span></div>}
+                    {totals.total_igst > 0 && <div className="flex justify-between text-sm text-gray-600"><span>IGST</span><span>&#8377;{totals.total_igst.toLocaleString()}</span></div>}
                     <div className="flex justify-between border-t pt-2 text-lg font-bold text-blue-700"><span>Grand Total</span><span>&#8377;{totals.grand_total.toLocaleString()}</span></div>
                   </>);
                 })()}
@@ -497,13 +714,19 @@ const Proposal = () => {
             <div className="space-y-4 bg-gray-50 rounded-xl p-5 border border-gray-200">
 
               {/* General */}
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input type="checkbox" checked={extra.terms_general} onChange={e => setExtra(ex => ({ ...ex, terms_general: e.target.checked }))} className="mt-1 accent-blue-600 w-4 h-4" />
-                <div>
-                  <p className="text-sm font-semibold text-gray-700">General Terms &amp; Conditions</p>
-                  <p className="text-xs text-gray-500">Standard terms apply to this quotation</p>
+              <div className="space-y-2">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input type="checkbox" checked={extra.terms_general} onChange={e => setExtra(ex => ({ ...ex, terms_general: e.target.checked }))} className="mt-1 accent-blue-600 w-4 h-4" />
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700">General Terms &amp; Conditions</p>
+                    <p className="text-xs text-gray-500">Standard terms apply to this quotation</p>
+                  </div>
+                </label>
+                <div className="flex flex-col gap-1 ml-7">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase">Custom Note</label>
+                  <input type="text" value={extra.custom_terms} onChange={e => setExtra(ex => ({ ...ex, custom_terms: e.target.value }))} placeholder="Additional terms..." className="border rounded-lg px-3 py-2 outline-none text-sm bg-white" />
                 </div>
-              </label>
+              </div>
 
               {/* Tax */}
               <label className="flex items-start gap-3 cursor-pointer">
@@ -521,13 +744,17 @@ const Proposal = () => {
               </div>
 
               {/* Validity */}
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input type="checkbox" checked={extra.terms_validity} onChange={e => setExtra(ex => ({ ...ex, terms_validity: e.target.checked }))} className="mt-1 accent-blue-600 w-4 h-4" />
-                <div>
-                  <p className="text-sm font-semibold text-gray-700">Validity</p>
-                  <p className="text-xs text-gray-500">Quote valid for 15 days from the date of quotation</p>
+              <div>
+                <p className="text-sm font-semibold text-gray-700">Validity</p>
+                <div className="flex flex-wrap gap-4 mt-2">
+                  {VALIDITY_OPTIONS.map(opt => (
+                    <label key={opt} className={`flex items-center gap-2 cursor-pointer border rounded-lg px-3 py-2 transition ${extra.terms_validity === opt ? "border-blue-500 bg-blue-50 text-blue-700" : "border-gray-200"}`}>
+                      <input type="radio" name="terms_validity" value={opt} checked={extra.terms_validity === opt} onChange={e => setExtra(ex => ({ ...ex, terms_validity: e.target.value }))} className="accent-blue-600" />
+                      <span className="text-xs">{opt}</span>
+                    </label>
+                  ))}
                 </div>
-              </label>
+              </div>
 
               {/* Separate Orders */}
               <div>
@@ -581,7 +808,7 @@ const Proposal = () => {
 
             {/* Submit */}
             <div className="flex gap-4 pt-4">
-              <button type="submit" className="bg-blue-600 text-white px-10 py-2.5 rounded-lg hover:bg-blue-700 font-bold shadow-lg transition">Save Invoice</button>
+              <button type="submit" className="bg-blue-600 text-white px-10 py-2.5 rounded-lg hover:bg-blue-700 font-bold shadow-lg transition">Save Quotation</button>
               <button type="button" onClick={() => { setOpen(false); resetForm(); }} className="bg-gray-200 text-gray-600 px-10 py-2.5 rounded-lg hover:bg-gray-300 font-bold transition">Cancel</button>
             </div>
           </form>
@@ -620,7 +847,7 @@ const Proposal = () => {
           <div className="flex gap-3 absolute right-6 top-6 z-10">
             <X className="cursor-pointer text-gray-400 hover:text-red-500 bg-white rounded-full p-1" onClick={() => { setShowInvoice(false); setTimeout(() => setViewId(null), 400); }} />
           </div>
-          <Invoice quotationId={viewId} />
+          <Invoice quotationId={viewId} type="quotation" />
         </div>
       )}
     </div>

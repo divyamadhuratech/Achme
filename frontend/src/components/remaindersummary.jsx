@@ -58,13 +58,10 @@ const Remainder = ({data,notes}) =>{
 
           <div className="text-center">
           {notes?.[activeTab3]?.length > 0 ? (
-             
           <p className="text-sm text-gray-700 font-medium">
-            {notes[activeTab3][0].followup_notes}
+            {notes[activeTab3][0].reminder_notes}
             <div className="w-3 h-3 bg-orange-500 rounded-full relative top-[-15px] left-[120px] "></div>
-
           </p>
-          
         ) : (
           <p className="text-black text-sm">
           <div className="w-3 h-3 bg-orange-500 rounded-full relative top-[17px] left-[80px] "></div>

@@ -25,28 +25,28 @@ router.get("/", (req, res) => {
 });
 
 /* CREATE CLIENT */
-router.post("/", (req, res) => {
-  const { name, company_name, email, phone, address, state, pincode } = req.body;
-  if (!name || !name.trim()) return res.status(400).json({ message: "Name is required" });
-  if (!email || !email.trim()) return res.status(400).json({ message: "Email is required" });
-  if (phone && !/^\d{0,13}$/.test(phone)) return res.status(400).json({ message: "Phone must be numeric, max 13 digits" });
+// router.post("/", (req, res) => {
+//   const { name, company_name, email, phone, address, state, pincode, gst_number } = req.body;
+//   if (!name || !name.trim()) return res.status(400).json({ message: "Name is required" });
+//   if (!email || !email.trim()) return res.status(400).json({ message: "Email is required" });
+//   if (phone && !/^\d{0,13}$/.test(phone)) return res.status(400).json({ message: "Phone must be numeric, max 13 digits" });
 
-  const sql = `INSERT INTO clients (name, company_name, email, phone, address, state, pincode) VALUES (?, ?, ?, ?, ?, ?, ?)`;
-  db.query(sql, [name, company_name, email, phone, address, state, pincode], (err, result) => {
-    if (err) return res.status(500).json({ message: "Insert failed", error: err });
-    res.json({ message: "Client created successfully", id: result.insertId });
-  });
-});
+//   const sql = `INSERT INTO clients (name, company_name, email, phone, address, state, pincode, gst_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+//   db.query(sql, [name, company_name, email, phone, address, state, pincode, gst_number], (err, result) => {
+//     if (err) return res.status(500).json({ message: "Insert failed", error: err });
+//     res.json({ message: "Client created successfully", id: result.insertId });
+//   });
+// });
 
 /* UPDATE CLIENT */
 router.put("/:id", (req, res) => {
-  const { name, company_name, email, phone, address, state, pincode } = req.body;
+  const { name, company_name, email, phone, address, state, pincode, gst_number } = req.body;
   const sql = `
     UPDATE clients 
-    SET name=?, company_name=?, email=?, phone=?, address=?, state=?, pincode=? 
+    SET name=?, company_name=?, email=?, phone=?, address=?, state=?, pincode=?, gst_number=? 
     WHERE id=?
   `;
-  db.query(sql, [name, company_name, email, phone, address, state, pincode, req.params.id], (err) => {
+  db.query(sql, [name, company_name, email, phone, address, state, pincode, gst_number, req.params.id], (err) => {
     if (err) return res.status(500).json(err);
     res.json({ message: "Client updated successfully" });
   });

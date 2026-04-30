@@ -165,6 +165,7 @@ body.modal-open {
   max-height: 8000px;
   opacity: 1;
   transform: translateY(0);
+  overflow: visible;
 }
 
 /* html {

@@ -16,8 +16,6 @@ const Walkins = () =>{
   const [isEdit, setIsEdit] = useState(false);
   const [editId, setEditId] = useState(null);
   
-
-
   const [form, setForm] = useState({
       customer_name: "",
        mobile_number: "",
@@ -33,6 +31,8 @@ const Walkins = () =>{
       reminder_date: new Date().toISOString().slice(0, 10),
        reminder_notes: "",
        reference: "",
+       email: "",
+
     });
 
     // Fetch Details
@@ -112,6 +112,7 @@ const openEdit = async (id) => {
         : "",
       reminder_notes: data.reminder_notes || "",
       reference: data.reference || "",
+      email: data.email || "",
     });
 
     setEditId(id);
@@ -185,7 +186,7 @@ const formatDate = (date) => {
 
           <div className="mt-2">
             <button
-              onClick={() => { setIsEdit(false); setForm({customer_name: "", mobile_number: "", location_city: "", walkin_date: new Date().toISOString().slice(0, 10), purpose: "", staff_name: "", walkin_status: "New", followup_required: "Default", followup_date: new Date().toISOString().slice(0, 10), followup_notes: "", reminder_required: "Default", reminder_date: new Date().toISOString().slice(0, 10), reminder_notes: "", reference: ""}); setOpen(true); }}
+              onClick={() => { setIsEdit(false); setForm({customer_name: "", mobile_number: "", location_city: "", walkin_date: new Date().toISOString().slice(0, 10), purpose: "", staff_name: "", walkin_status: "New", followup_required: "Default", followup_date: new Date().toISOString().slice(0, 10), followup_notes: "", reminder_required: "Default", reminder_date: new Date().toISOString().slice(0, 10), reminder_notes: "", reference: "", email: ""}); setOpen(true); }}
               className="bg-[#FF3355] text-white w-12 h-12 rounded-full flex justify-center items-center shadow-lg hover:bg-[#e62848] "
             >
               <Plus size={24} />
@@ -196,9 +197,10 @@ const formatDate = (date) => {
     
       {/* Forms tab */}
 
-       <div className="application-maintab  p-5">
+       <div className="application-maintab  p-5 ">
            <div className={`overlay ${open ? "show" : ""} justify-items-center `}>
-           <div  className={`task-application bg-white shadow w-[65%] ml-[24px] mt-[30px] mb-[20px] z-70  p-10 rounded-lg  ${
+
+           <div  className={`task-application bg-white shadow w-[65%] ml-[24px] mt-[65px] mb-[30px] z-70  p-10 rounded-lg  ${
              open ? "show" : ""
             }`}>
               {/*  */}
@@ -214,8 +216,10 @@ const formatDate = (date) => {
 
             <form action="" onSubmit={saveWalkins} className=" invoice-form p-6 space-y-6 relative">
                 <div className="grid grid-cols-4 items-center gap-6">
-                   <label htmlFor="" className="text-sm text-gray-600 text-left">Customer Name</label>
-                   <input type="text" value={form.customer_name}  onChange={handleChange} name="customer_name" placeholder="e.g. Ravi Kumar" onKeyDown={e => { if (/[0-9]/.test(e.key)) e.preventDefault(); }} className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
+                   <label htmlFor="" className="text-sm text-gray-600 text-left">Customer Name<span className="text-red-500">*</span>
+
+                   </label>
+                   <input type="text" required value={form.customer_name}  onChange={handleChange} name="customer_name" placeholder="e.g. Ravi Kumar" onKeyDown={e => { if (/[0-9]/.test(e.key)) e.preventDefault(); }} className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
                 </div>
 
                 {/*  */}
@@ -235,7 +239,7 @@ const formatDate = (date) => {
 
                  <div className="grid grid-cols-4 items-center gap-6">
                    <label htmlFor=""  className="text-sm text-gray-600 text-left">Walkin Date</label>
-                   <input type="Date" value={form.walkin_date} onChange={handleChange} name="walkin_date" className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
+                   <input type="Date" readOnly value={form.walkin_date} onChange={handleChange} name="walkin_date" className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
                 </div>
 
                 {/*  */}
@@ -254,6 +258,13 @@ const formatDate = (date) => {
                    <label htmlFor="" className="text-sm text-gray-600 text-left">Reference</label>
                    <input type="text" value={form.reference} onChange={handleChange} name="reference" className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
                 </div>
+
+                <div className="grid grid-cols-4 items-center gap-6">
+                   <label htmlFor="" className="text-sm text-gray-600 text-left">Email</label>
+                   <input type="email" value={form.email} onChange={handleChange} name="email" className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
+                </div>
+
+             
   
               {/*Call outcome  */}
                  
@@ -262,7 +273,7 @@ const formatDate = (date) => {
                 </label>
                  <div className="relative col-span-3">
     {/* INPUT */}
-                  <input type="text" readOnly value={form.walkin_status} name="walkin_status" placeholder="Select Outcome"   onClick={() => setOutcomeOpen(!outcomeOpen)}
+                  <input type="text" required readOnly value={form.walkin_status} name="walkin_status" placeholder="Select Outcome"   onClick={() => setOutcomeOpen(!outcomeOpen)}
                   className="border rounded-md px-3 py-2 outline-none w-full cursor-pointer "/>
 
     {/* ICON */}
@@ -310,7 +321,7 @@ const formatDate = (date) => {
                       <label className="text-sm text-gray-600 text-left ">Follow Up </label>
                       <div className="relative left-[60px]">
          {/* INPUT */}
-                       <input type="text" readOnly value={form.followup_required} name="followup_required" placeholder="Select Follow Up"   onClick={() => setFollowOpen(!followOpen)}
+                       <input type="text" required readOnly value={form.followup_required} name="followup_required" placeholder="Select Follow Up"   onClick={() => setFollowOpen(!followOpen)}
                        className="border rounded-md px-3 py-2 outline-none w-full cursor-pointer "/>
      
          {/* ICON */}
@@ -324,7 +335,7 @@ const formatDate = (date) => {
               {/* DROPDOWN OPTIONS */}
                    {followOpen && (
                       <div className="absolute left-0 right-0 bg-white border rounded-md mt-1 shadow-lg z-20">
-                      {["Default","Yes","No"].map((outcome) => (
+                      {["Yes","No"].map((outcome) => (
                <div
                  key={outcome}
                  onClick={() => {
@@ -339,18 +350,21 @@ const formatDate = (date) => {
            </div>
          )}
        </div>
+
         <div className="flex items-center gap-10 relative left-[80px]">
             <label htmlFor="" className="text-sm text-gray-600 w-[110px] whitespace-nowrap ml-[10px]">Followup Date</label>
-            <input type="Date" value={form.followup_date} onChange={handleChange} name="followup_date" className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]" />
+            <input type="Date" required value={form.followup_date} onChange={handleChange} name="followup_date" className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]" />
           </div>
        </div>
+
         <div className="flex items-center gap-4 mt-[25px]">
              <label className="text-sm text-gray-600 w-[110px] whitespace-nowrap">
-               Followup Notes
+               Followup Notes <span className="text-red-500">*</span>
              </label>
      
              <input
                type="text"
+               required
                onChange={handleChange}
                value={form.followup_notes}
                name="followup_notes"
@@ -359,8 +373,6 @@ const formatDate = (date) => {
            </div>
      
            {/* Remainder */}
-     
-     
                     <div className="items-center more mt-6">
                     <div className=" flex items-center gap-2">
                       <label className="text-sm text-gray-600 text-left ">Remainder Up </label>
@@ -380,7 +392,7 @@ const formatDate = (date) => {
               {/* DROPDOWN OPTIONS */}
                    {remainderDetails && (
                       <div className="absolute left-0 right-0 bg-white border rounded-md mt-1 shadow-lg z-20">
-                      {["Default","Yes","No"].map((outcome) => (
+                      {["Yes","No"].map((outcome) => (
                <div
                   key={outcome}
                   onClick={() => {
@@ -453,6 +465,8 @@ const formatDate = (date) => {
                 <th className="border px-4 py-3">Service</th>
                 <th className="border px-4 py-3">Staff</th>
                 <th className="border px-4 py-3">Reference</th>
+               
+                <th className="border px-4 py-3">Outcome Status</th>
                 <th className="border px-4 py-3 w-[90px] text-center">Actions</th>
               </tr>
             </thead>
@@ -486,6 +500,10 @@ const formatDate = (date) => {
                   </td>
                   <td className="border px-4 py-2">
                     {W.reference}
+                  </td>
+                
+                  <td className="border px-4 py-2">
+                    {W.walkin_status}
                   </td>
                   <td className="border px-4 py-2 text-center">
                     <div className="flex justify-center gap-2">

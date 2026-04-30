@@ -27,7 +27,8 @@ router.delete("/from-addresses/:id", (req, res) => {
 router.get("/", (req, res) => {
   const sql = `
     SELECT q.id, q.quotation_date AS invoice_date, q.grand_total, q.reference_no,
-           c.customer_name, c.mobile_number, c.location_city, c.email,
+           c.customer_name, c.mobile_number, c.email,
+           COALESCE(q.client_city, c.location_city) AS location_city,
            MIN(qi.description) AS description
     FROM quotations q
     JOIN customers c ON c.id = q.customer_id
@@ -48,7 +49,7 @@ router.get("/:id", (req, res) => {
     SELECT 
       q.id AS quotation_id,
       q.quotation_date AS invoice_date,
-      q.subtotal, q.total_tax, q.total_cgst, q.total_sgst, q.total_discount, q.grand_total,
+      q.subtotal, q.total_tax, q.total_cgst, q.total_sgst, q.total_igst, q.total_discount, q.grand_total,
       q.reference_no, q.from_address_id, q.from_address_custom,
       COALESCE(q.from_address_custom, fa.address) AS resolved_from_address,
       q.client_company, q.client_address1, q.client_address2, q.client_city,
@@ -56,9 +57,12 @@ router.get("/:id", (req, res) => {
       q.tax_type, q.custom_tax, q.exec_name, q.exec_phone, q.exec_email,
       q.terms_general, q.terms_tax, q.terms_project_period, q.terms_validity,
       q.terms_separate_orders, q.terms_payment, q.terms_payment_custom, q.terms_warranty,
-      c.customer_name, c.mobile_number, c.email, c.location_city,
+      q.hsn_sac_code, q.supplier_branch,
+      q.bank_details_id, q.bank_company, q.bank_name, q.bank_account, q.bank_ifsc, q.bank_branch, q.custom_terms,
+      c.customer_name, c.mobile_number, c.email, c.gst_number, c.location_city,
       qi.product_number, qi.description, qi.brand_model, qi.uom,
-      qi.price, qi.quantity, qi.tax, qi.discount, qi.subtotal AS item_subtotal
+      qi.price, qi.quantity, qi.tax, qi.discount, qi.subtotal AS item_subtotal,
+      qi.hsn_sac
     FROM quotations q
     JOIN customers c ON c.id = q.customer_id
     JOIN quotation_items qi ON qi.quotation_id = q.id
@@ -110,50 +114,84 @@ router.post("/create", (req, res) => {
 
     // Save to customers table
     db.query(
-      `INSERT INTO customers (customer_name, mobile_number, email, location_city) VALUES (?,?,?,?)`,
-      [customer.customer_name, customer.mobile_number, customer.email, customer.location_city],
+      `INSERT INTO customers (customer_name, mobile_number, email, gst_number, location_city) VALUES (?,?,?,?,?)`,
+      [customer.customer_name, customer.mobile_number, customer.email, customer.gst_number || null, customer.location_city],
       (err, customerResult) => {
         if (err) return db.rollback(() => res.status(500).json(err));
         const customerId = customerResult.insertId;
 
         // Also save to clients table for cross-module reuse
         db.query(
-          `INSERT INTO clients (name, company_name, email, phone) VALUES (?,?,?,?)`,
-          [customer.customer_name, ex.client_company || customer.customer_name, customer.email, customer.mobile_number],
-          () => {} // non-blocking, best effort
+          "SELECT id FROM clients WHERE phone = ?",
+          [customer.mobile_number],
+          (err, clientRows) => {
+            if (!err && clientRows.length === 0) {
+              db.query(
+                `INSERT INTO clients (name, company_name, email, phone, gst_number, address, state, pincode) VALUES (?,?,?,?,?,?,?,?)`,
+                [
+                  customer.customer_name,
+                  ex.client_company || customer.customer_name,
+                  customer.email,
+                  customer.mobile_number,
+                  customer.gst_number || null,
+                  ex.client_address1 || null,
+                  ex.client_state || null,
+                  ex.client_pincode || null
+                ]
+              );
+            } else if (!err && clientRows.length > 0) {
+               // Update existing client with latest details from proposal
+               db.query(
+                 `UPDATE clients SET name=?, company_name=?, email=?, gst_number=?, address=?, state=?, pincode=? WHERE id=?`,
+                 [
+                   customer.customer_name,
+                   ex.client_company || customer.customer_name,
+                   customer.email,
+                   customer.gst_number || null,
+                   ex.client_address1 || null,
+                   ex.client_state || null,
+                   ex.client_pincode || null,
+                   clientRows[0].id
+                 ]
+               );
+            }
+          }
         );
 
         db.query(
           `INSERT INTO quotations
-           (customer_id, quotation_date, total_cgst, total_sgst, subtotal, total_tax, total_discount, grand_total,
+           (customer_id, quotation_date, total_cgst, total_sgst, total_igst, subtotal, total_tax, total_discount, grand_total,
             reference_no, from_address_id, from_address_custom,
             client_company, client_address1, client_address2, client_city, client_state, client_pincode, client_country,
             tax_type, custom_tax, exec_name, exec_phone, exec_email,
             terms_general, terms_tax, terms_project_period, terms_validity, terms_separate_orders,
-            terms_payment, terms_payment_custom, terms_warranty)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            terms_payment, terms_payment_custom, terms_warranty, hsn_sac_code, supplier_branch,
+            bank_details_id, bank_company, bank_name, bank_account, bank_ifsc, bank_branch, custom_terms)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
           [
             customerId, quotationDate,
-            q.total_cgst || 0, q.total_sgst || 0, q.subtotal || 0,
-            (q.total_cgst || 0) + (q.total_sgst || 0), q.total_discount || 0, q.grand_total || 0,
-            refNo, ex.from_address_id || null, ex.from_address_custom || null,
+            q.total_cgst || 0, q.total_sgst || 0, q.total_igst || 0, q.subtotal || 0,
+            (q.total_cgst || 0) + (q.total_sgst || 0) + (q.total_igst || 0), q.total_discount || 0, q.grand_total || 0,
+            refNo, (ex.from_address_id === "" || !ex.from_address_id) ? null : ex.from_address_id, ex.from_address_custom || null,
             ex.client_company || null, ex.client_address1 || null, ex.client_address2 || null,
             ex.client_city || null, ex.client_state || null, ex.client_pincode || null, ex.client_country || "India",
-            ex.tax_type || "GST18", ex.custom_tax || null,
+            ex.tax_type || "GST18", (ex.custom_tax === "" || !ex.custom_tax) ? null : ex.custom_tax,
             ex.exec_name || null, ex.exec_phone || null, ex.exec_email || null,
             ex.terms_general ? 1 : 0, ex.terms_tax ? 1 : 0, ex.terms_project_period || null,
-            ex.terms_validity ? 1 : 0, ex.terms_separate_orders ? JSON.stringify(ex.terms_separate_orders) : null,
+            ex.terms_validity || ex.terms_validity_days || null, ex.terms_separate_orders ? JSON.stringify(ex.terms_separate_orders) : null,
             ex.terms_payment || null, ex.terms_payment_custom || null, ex.terms_warranty || null,
+            ex.hsn_sac_code || null, ex.supplier_branch || null,
+            ex.bank_details_id || null, ex.bank_company || null, ex.bank_name || null, ex.bank_account || null, ex.bank_ifsc || null, ex.bank_branch || null, ex.custom_terms || null,
           ],
           (err, quotationResult) => {
             if (err) return db.rollback(() => res.status(500).json(err));
             const quotationId = quotationResult.insertId;
             const values = items.map((item, index) => [
-              quotationId, index + 1, item.description, item.brand_model || null, item.uom || "Nos",
+              quotationId, index + 1, item.description, item.brand_model || null, item.hsn_sac || null, item.uom || "Nos",
               item.price, item.quantity, item.tax, item.discount, item.subtotal,
             ]);
             db.query(
-              `INSERT INTO quotation_items (quotation_id, product_number, description, brand_model, uom, price, quantity, tax, discount, subtotal) VALUES ?`,
+              `INSERT INTO quotation_items (quotation_id, product_number, description, brand_model, hsn_sac, uom, price, quantity, tax, discount, subtotal) VALUES ?`,
               [values],
               err => {
                 if (err) return db.rollback(() => res.status(500).json(err));
@@ -189,32 +227,36 @@ router.put("/:id", (req, res) => {
     if (err) return res.status(500).json(err);
 
     db.query(
-      `UPDATE customers SET customer_name=?, mobile_number=?, email=?, location_city=?
+      `UPDATE customers SET customer_name=?, mobile_number=?, email=?, gst_number=?, location_city=?
        WHERE id = (SELECT customer_id FROM quotations WHERE id=?)`,
-      [customer.customer_name, customer.mobile_number, customer.email, customer.location_city, id],
+      [customer.customer_name, customer.mobile_number, customer.email, customer.gst_number || null, customer.location_city, id],
       err => {
         if (err) return db.rollback(() => res.status(500).json(err));
 
         db.query(
           `UPDATE quotations SET
-           quotation_date=?, subtotal=?, total_cgst=?, total_sgst=?, total_tax=?, total_discount=?, grand_total=?,
+           quotation_date=?, subtotal=?, total_cgst=?, total_sgst=?, total_igst=?, total_tax=?, total_discount=?, grand_total=?,
            from_address_id=?, from_address_custom=?,
            client_company=?, client_address1=?, client_address2=?, client_city=?, client_state=?, client_pincode=?, client_country=?,
            tax_type=?, custom_tax=?, exec_name=?, exec_phone=?, exec_email=?,
            terms_general=?, terms_tax=?, terms_project_period=?, terms_validity=?, terms_separate_orders=?,
-           terms_payment=?, terms_payment_custom=?, terms_warranty=?
+           terms_payment=?, terms_payment_custom=?, terms_warranty=?,
+           hsn_sac_code=?, supplier_branch=?,
+           bank_details_id=?, bank_company=?, bank_name=?, bank_account=?, bank_ifsc=?, bank_branch=?, custom_terms=?
            WHERE id=?`,
           [
-            quotationDate, q.subtotal || 0, q.total_cgst || 0, q.total_sgst || 0,
-            (q.total_cgst || 0) + (q.total_sgst || 0), q.total_discount || 0, q.grand_total || 0,
+            quotationDate, q.subtotal || 0, q.total_cgst || 0, q.total_sgst || 0, q.total_igst || 0,
+            (q.total_cgst || 0) + (q.total_sgst || 0) + (q.total_igst || 0), q.total_discount || 0, q.grand_total || 0,
             ex.from_address_id || null, ex.from_address_custom || null,
             ex.client_company || null, ex.client_address1 || null, ex.client_address2 || null,
             ex.client_city || null, ex.client_state || null, ex.client_pincode || null, ex.client_country || "India",
             ex.tax_type || "GST18", ex.custom_tax || null,
             ex.exec_name || null, ex.exec_phone || null, ex.exec_email || null,
             ex.terms_general ? 1 : 0, ex.terms_tax ? 1 : 0, ex.terms_project_period || null,
-            ex.terms_validity ? 1 : 0, ex.terms_separate_orders ? JSON.stringify(ex.terms_separate_orders) : null,
+            ex.terms_validity || ex.terms_validity_days || null, ex.terms_separate_orders ? JSON.stringify(ex.terms_separate_orders) : null,
             ex.terms_payment || null, ex.terms_payment_custom || null, ex.terms_warranty || null,
+            ex.hsn_sac_code || null, ex.supplier_branch || null,
+            ex.bank_details_id || null, ex.bank_company || null, ex.bank_name || null, ex.bank_account || null, ex.bank_ifsc || null, ex.bank_branch || null, ex.custom_terms || null,
             id
           ],
           err => {
@@ -224,12 +266,12 @@ router.put("/:id", (req, res) => {
               if (err) return db.rollback(() => res.status(500).json(err));
 
               const values = items.map((item, index) => [
-                id, index + 1, item.description, item.brand_model || null, item.uom || "Nos",
+                id, index + 1, item.description, item.brand_model || null, item.hsn_sac || null, item.uom || "Nos",
                 item.price, item.quantity, item.tax, item.discount, item.subtotal,
               ]);
 
               db.query(
-                `INSERT INTO quotation_items (quotation_id, product_number, description, brand_model, uom, price, quantity, tax, discount, subtotal) VALUES ?`,
+                `INSERT INTO quotation_items (quotation_id, product_number, description, brand_model, hsn_sac, uom, price, quantity, tax, discount, subtotal) VALUES ?`,
                 [values],
                 err => {
                   if (err) return db.rollback(() => res.status(500).json(err));
@@ -311,13 +353,15 @@ router.post("/send-email/:id", (req, res) => {
 
   const headerSql = `
     SELECT q.*, c.email, c.customer_name, c.mobile_number, c.location_city,
-           q.grand_total, q.quotation_date, q.subtotal, q.total_cgst, q.total_sgst, q.total_discount
+           q.quotation_date AS invoice_date,
+           COALESCE(q.from_address_custom, fa.address) AS resolved_from_address
     FROM quotations q
     JOIN customers c ON q.customer_id = c.id
+    LEFT JOIN pi_from_addresses fa ON fa.id = q.from_address_id
     WHERE q.id = ?`;
 
   const itemsSql = `
-    SELECT product_number, description, price, quantity, subtotal
+    SELECT product_number, description, brand_model, hsn_sac, uom, price, quantity, tax, discount, subtotal
     FROM quotation_items WHERE quotation_id = ? ORDER BY product_number`;
 
   db.query(headerSql, [id], (err, headerRows) => {
@@ -325,8 +369,7 @@ router.post("/send-email/:id", (req, res) => {
     if (!headerRows.length) return res.status(404).json({ message: "Quotation not found" });
 
     const quotation = headerRows[0];
-    // normalize field name so generateInvoicePdf can use invoice_date
-    quotation.invoice_date = quotation.quotation_date;
+    // invoice_date already aliased in SQL
 
     const recipientEmail = to || quotation.email;
     if (!recipientEmail) return res.status(400).json({ message: "No email address provided" });

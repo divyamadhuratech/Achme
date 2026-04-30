@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Search, Plus, X, Edit, Trash2 } from "lucide-react";
+import { Search, X, Edit, Trash2 } from "lucide-react";
 import "../Styles/tailwind.css";
 import axios from "axios";
 
@@ -45,6 +45,7 @@ const Clients = () => {
     address: "",
     state: "",
     pincode: "",
+    gst_number: "",
   });
 
   const handleChange = (e) =>
@@ -80,6 +81,7 @@ const Clients = () => {
       address: "",
       state: "",
       pincode: "",
+      gst_number: "",
     });
     setIsEdit(false);
     setSelectedClientId(null);
@@ -94,6 +96,7 @@ const Clients = () => {
       address: selectedClient.address || "",
       state: selectedClient.state || "",
       pincode: selectedClient.pincode || "",
+      gst_number: selectedClient.gst_number || "",
     });
 
     setSelectedClientId(selectedClient.id);
@@ -101,10 +104,7 @@ const Clients = () => {
     setOpen(true);
   };
 
-  const tabopen = () => {
-    resetForm();
-    setOpen(true);
-  };
+
 
   useEffect(() => {
     if (open) {
@@ -144,13 +144,7 @@ const Clients = () => {
           />
         </div>
 
-        {/* Floating Add Button */}
-        <button
-          onClick={tabopen}
-          className="bg-[#FF3355] text-white w-12 h-12 rounded-full flex justify-center items-center shadow-lg hover:bg-[#e62848]"
-        >
-          <Plus size={24} />
-        </button>
+       
       </div>
 
       {/* Table */}
@@ -160,10 +154,10 @@ const Clients = () => {
             <tr className="text-black font-[Times-New-Roman] uppercase text-xs border-b">
               <th className="px-4 py-3 border text-left">ID</th>
               <th className="px-4 py-3 border text-left">Name</th>
-              <th className="px-4 py-3 border text-left">Company</th>
               <th className="px-4 py-3 border text-left">Email</th>
               <th className="px-4 py-3 border text-left">Phone</th>
-              <th className="px-4 py-3 border text-left">Address</th>
+              <th className="px-4 py-3 border text-left">City</th>
+              <th className="px-4 py-3 border text-left">Service</th>
               <th className="px-4 py-3 border text-center">Actions</th>
             </tr>
           </thead>
@@ -172,20 +166,12 @@ const Clients = () => {
               <tr key={c.id} className="border-b border-gray-200 hover:bg-gray-50 transition">
                 <td className="px-4 py-3 border">{c.id}</td>
                 <td className="px-4 py-3 border font-medium">{c.name}</td>
-                <td className="px-4 py-3 border">{c.company_name}</td>
                 <td className="px-4 py-3 border">{c.email}</td>
                 <td className="px-4 py-3 border">{c.phone}</td>
-                <td className="px-4 py-3 border">{c.address}, {c.state} - {c.pincode}</td>
+                <td className="px-4 py-3 border">{c.address}</td>
+                <td className="px-4 py-3 border">{c.service}</td>
                 <td className="px-4 py-3 border">
-                  <div className="flex justify-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => openEditModal(c)}
-                      className="text-blue-600 hover:text-blue-800 transition"
-                      title="Edit"
-                    >
-                      <Edit size={18} />
-                    </button>
+                  <div className="flex justify-center">
                     <button
                       type="button"
                       onClick={() => deleteClient(c.id)}
@@ -207,121 +193,7 @@ const Clients = () => {
         </table>
       </div>
 
-      {/* Form Modal */}
-      <div className={`overlay ${open ? "show" : ""} justify-items-center`}>
-        <div className={`${open ? "show" : ""} task-application bg-white shadow-2xl p-9 rounded-xl w-[60%] z-50 mt-10`}>
-          <div className="flex justify-between items-center mb-8">
-            <h2 className="text-2xl font-semibold text-gray-700">
-              {isEdit ? "Edit Client" : "Add A New Client"}
-            </h2>
-            <span
-              className="x-icon cursor-pointer"
-              onClick={() => setOpen(false)}
-            >
-              <X />
-            </span>
-          </div>
 
-          <form onSubmit={saveClient} className="task-form space-y-6">
-            <div className="flex items-center gap-6">
-              <label className="w-40 text-lg">Name*</label>
-              <input
-                type="text"
-                name="name"
-                value={form.name}
-                onChange={handleChange}
-                required
-                className="form-control w-[60%] border rounded-lg p-2"
-              />
-            </div>
-
-            <div className="flex items-center gap-6">
-              <label className="w-40 text-lg">Company Name</label>
-              <input
-                type="text"
-                name="company_name"
-                value={form.company_name}
-                onChange={handleChange}
-                className="form-control w-[60%] border rounded-lg p-2"
-              />
-            </div>
-
-            <div className="flex items-center gap-6">
-              <label className="w-40 text-lg">Email*</label>
-              <input
-                type="email"
-                name="email"
-                value={form.email}
-                onChange={handleChange}
-                required
-                className="form-control w-[60%] border rounded-lg p-2"
-              />
-            </div>
-
-            <div className="flex items-center gap-6">
-              <label className="w-40 text-lg">Phone</label>
-              <input
-                type="text"
-                name="phone"
-                value={form.phone}
-                onChange={e => { if (/^\d{0,13}$/.test(e.target.value)) handleChange(e); }}
-                maxLength={13}
-                inputMode="numeric"
-                className="form-control w-[60%] border rounded-lg p-2"
-              />
-            </div>
-
-            <div className="flex items-center gap-6">
-              <label className="w-40 text-lg">Address</label>
-              <input
-                type="text"
-                name="address"
-                value={form.address}
-                onChange={handleChange}
-                className="form-control w-[60%] border rounded-lg p-2"
-              />
-            </div>
-
-            <div className="flex items-center gap-6">
-              <label className="w-40 text-lg">State</label>
-              <input
-                type="text"
-                name="state"
-                value={form.state}
-                onChange={handleChange}
-                className="form-control w-[60%] border rounded-lg p-2"
-              />
-            </div>
-
-            <div className="flex items-center gap-6">
-              <label className="w-40 text-lg">Pincode</label>
-              <input
-                type="text"
-                name="pincode"
-                value={form.pincode}
-                onChange={handleChange}
-                className="form-control w-[60%] border rounded-lg p-2"
-              />
-            </div>
-
-            <div className="flex gap-4 pt-4">
-              <button
-                type="submit"
-                className="bg-blue-600 text-white px-8 py-2 rounded-lg hover:bg-blue-700 transition shadow-md"
-              >
-                Submit
-              </button>
-              <button
-                onClick={() => setOpen(false)}
-                type="button"
-                className="bg-gray-400 text-white px-8 py-2 rounded-lg hover:bg-red-500 transition shadow-md"
-              >
-                Close
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
     </div>
   );
 };

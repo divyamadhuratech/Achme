@@ -30,6 +30,7 @@ const UserSidebar  = ({ onNavigate }) => {
     },
   
     { icon: <FileText size={20} />, title: "Proposals",path:"/dashboard/proposal"},
+    { icon: <Headphones size={20} />, title: "Services", subitems: [{label: "Call Report", path: "/dashboard/call-report"}] },
     { icon: <Users2 size={20} />, title: "Team",subitems:[{label: "Team Member", path:"/dashboard/team"},"Time Sheets" ] },
     { icon: <BarChart2 size={20} />, title: "Reports" }
   ];
