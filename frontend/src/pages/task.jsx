@@ -19,7 +19,16 @@ const Task = () => {
     }
   };
 
-  useEffect(() => { fetchtask(); }, []);
+  const [teamMembers, setTeamMembers] = useState([]);
+
+  const fetchTeamMembers = async () => {
+    try {
+      const res = await axios.get("http://localhost:3000/api/teammember");
+      setTeamMembers(res.data);
+    } catch (_) {}
+  };
+
+  useEffect(() => { fetchtask(); fetchTeamMembers(); }, []);
 
   const deleteTask = async (id) => {
     if (!window.confirm("Delete this task?")) return;
@@ -160,7 +169,6 @@ const Task = () => {
               { label: "Project Name *", name: "project_name", type: "text" },
               { label: "Task Title *", name: "task_title", type: "text" },
               { label: "Client Name", name: "client_name", type: "text" },
-              { label: "Staff Name", name: "staff_name", type: "text" },
               { label: "Created Date", name: "created_date", type: "date" },
               { label: "Due Date", name: "due_date", type: "date" },
             ].map(f => (
@@ -170,6 +178,24 @@ const Task = () => {
                   className="form-control w-[60%] border rounded-lg p-2 outline-none focus:border-blue-400" />
               </div>
             ))}
+
+            {/* Staff Name — dropdown from Team Members */}
+            <div className="flex items-center gap-6">
+              <label className="w-40 text-sm text-gray-600">Staff Name</label>
+              <select
+                name="staff_name"
+                value={form.staff_name}
+                onChange={handleChange}
+                className="form-control w-[60%] border rounded-lg p-2 outline-none focus:border-blue-400 bg-white"
+              >
+                <option value="">-- Select Staff --</option>
+                {teamMembers.map(t => (
+                  <option key={t.id} value={`${t.first_name} ${t.last_name || ""}`.trim()}>
+                    {t.first_name} {t.last_name || ""} {t.job_title ? `(${t.job_title})` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             <div className="flex items-center gap-6">
               <label className="w-40 text-sm text-gray-600">Status *</label>

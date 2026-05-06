@@ -4,7 +4,15 @@ const db = require("../config/database");
 
 // GET all telecalls
 router.get("/", (req, res) => {
-  db.query("SELECT * FROM Walkins ORDER BY id ASC", (err, results) => {
+  const { user_id, role, user_name } = req.query;
+  let sql = "SELECT * FROM Walkins";
+  const params = [];
+  if (role === "user" && user_name) {
+    sql += " WHERE staff_name = ? OR assigned_to = ?";
+    params.push(user_name, user_id || 0);
+  }
+  sql += " ORDER BY id DESC";
+  db.query(sql, params, (err, results) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(results);
   });
@@ -14,26 +22,21 @@ const syncClient = (data) => {
   const { customer_name, mobile_number, location_city, purpose, email, walkin_status } = data;
 
   if (walkin_status === "Converted") {
-    db.query(
-      "SELECT * FROM clients WHERE phone = ?",
-      [mobile_number],
-      (err, result) => {
-        if (err) return;
-        if (result.length === 0) {
-          db.query(
-            "INSERT INTO clients (name, phone, address, service, email) VALUES (?, ?, ?, ?, ?)",
-            [customer_name, mobile_number, location_city, purpose, email]
-          );
-        } else {
-          db.query(
-            "UPDATE clients SET name=?, address=?, service=?, email=? WHERE phone=?",
-            [customer_name, location_city, purpose, email, mobile_number]
-          );
-        }
+    db.query("SELECT id FROM clients WHERE phone = ?", [mobile_number], (err, result) => {
+      if (err) return;
+      if (result.length === 0) {
+        db.query(
+          "INSERT INTO clients (name, phone, address, service, email) VALUES (?, ?, ?, ?, ?)",
+          [customer_name, mobile_number, location_city, purpose, email]
+        );
+      } else {
+        db.query(
+          "UPDATE clients SET name=?, address=?, service=?, email=? WHERE phone=?",
+          [customer_name, location_city, purpose, email, mobile_number]
+        );
       }
-    );
+    });
   } else {
-    // If not converted, ensure it's removed from clients if it exists
     db.query("DELETE FROM clients WHERE phone = ?", [mobile_number]);
   }
 };
@@ -104,7 +107,14 @@ router.post("/", (req, res) => {
     (err, result) => {
       if (err) return res.status(500).json({ error: err.message });
       syncClient(req.body);
-      res.json({ message: "Walkins added", id: result.insertId });
+      const newId = result.insertId;
+      db.query("INSERT INTO lead_activity (lead_id, lead_type, action, details) VALUES (?,?,?,?)",
+        [newId, "walkin", "Lead Created", `Status: ${walkin_status || "New"}`]);
+      if (reminder_required === "Yes" && reminder_date) {
+        db.query("INSERT INTO lead_reminders (lead_id, lead_type, reminder_date, reminder_notes, status) VALUES (?,?,?,?,'Pending')",
+          [newId, "walkin", reminder_date, reminder_notes || ""]);
+      }
+      res.json({ message: "Walkins added", id: newId });
     }
   );
 });
@@ -194,12 +204,25 @@ router.put("/:id", (req, res) => {
         console.error("Update error:", err);
         return res.status(500).json({ error: err.message });
       }
-
       if (result.affectedRows === 0) {
         return res.status(404).json({ message: "Walkin not found" });
       }
-
       syncClient(req.body);
+      const id = req.params.id;
+      db.query("INSERT INTO lead_activity (lead_id, lead_type, action, details) VALUES (?,?,?,?)",
+        [id, "walkin", "Status Updated", `Outcome: ${walkin_status || "New"}`]);
+      if (followup_required === "Yes" && followup_date) {
+        db.query("INSERT INTO lead_activity (lead_id, lead_type, action, details) VALUES (?,?,?,?)",
+          [id, "walkin", "Follow-up Scheduled", `Date: ${followup_date}${followup_notes ? " | Notes: " + followup_notes : ""}`]);
+      }
+      if (reminder_required === "Yes" && reminder_date) {
+        db.query("INSERT INTO lead_reminders (lead_id, lead_type, reminder_date, reminder_notes, status) VALUES (?,?,?,?,'Pending')",
+          [id, "walkin", reminder_date, reminder_notes || ""],
+          (e) => {
+            if (!e) db.query("INSERT INTO lead_activity (lead_id, lead_type, action, details) VALUES (?,?,?,?)",
+              [id, "walkin", "Reminder Added", `Date: ${reminder_date}${reminder_notes ? " | " + reminder_notes : ""}`]);
+          });
+      }
       res.json({ message: "Walkin updated successfully" });
     }
   );

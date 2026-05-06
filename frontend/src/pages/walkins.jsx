@@ -1,10 +1,13 @@
 import React,{useState,useEffect} from "react";
 import "../Styles/tailwind.css";
-import { Search, Plus,X,ChevronDown,Trash2,Edit} from "lucide-react";
+import { Search, Plus, X, ChevronDown, Trash2, Edit, FileText, History, Bell, Clock } from "lucide-react";
 import { getToday } from "../utils/leadutil";
 import axios from "axios";
+import { useAuth } from "../auth/AuthContext";
 
 const Walkins = () =>{
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
     const [outcomeOpen, setOutcomeOpen] = useState(false);
     const [showMoreDetails, setShowMoreDetails] = useState(false);
     const [remainderDetails, setRemainderDetails] = useState(false);
@@ -38,19 +41,94 @@ const Walkins = () =>{
     // Fetch Details
 const [Walkings,setWalkins]=useState([])
 const [searchTerm, setSearchTerm] = useState("");
+const [missedCounts, setMissedCounts] = useState({});
+const [teamMembers, setTeamMembers] = useState([]);
+const [historyOpen, setHistoryOpen] = useState(false);
+const [historyLead, setHistoryLead] = useState(null);
+const [historyActivity, setHistoryActivity] = useState([]);
+const [historyReminders, setHistoryReminders] = useState([]);
+const [reminderOpen, setReminderOpen] = useState(false);
+const [reminderLeadId, setReminderLeadId] = useState(null);
+const [reminderLeadName, setReminderLeadName] = useState("");
+const [newReminderDate, setNewReminderDate] = useState("");
+const [newReminderTime, setNewReminderTime] = useState("");
+const [newReminderNote, setNewReminderNote] = useState("");
+const [leadReminders, setLeadReminders] = useState([]);
 
    const fetchWalkins = async () => {
   try {
-    const res = await axios.get("http://localhost:3000/api/Walkins");
+    const params = isAdmin ? {} : { user_id: user?.id, role: "user" };
+    const res = await axios.get("http://localhost:3000/api/Walkins", { params });
     setWalkins(res.data);
-  } catch (err) {
-    console.error(err.message);
-  }
+  } catch (err) { console.error(err.message); }
 };
 
-useEffect(() => {
-  fetchWalkins();
+const fetchMissedCounts = async () => {
+  try {
+    const res = await axios.get("http://localhost:3000/api/leads/missed-counts/walkin");
+    const map = {};
+    res.data.forEach(r => { map[r.lead_id] = r.missed_count; });
+    setMissedCounts(map);
+  } catch (_) {}
+};
+
+useEffect(() => { fetchWalkins(); fetchMissedCounts(); 
+  axios.get("http://localhost:3000/api/teammember").then(r => setTeamMembers(r.data)).catch(() => {});
 }, []);
+
+const formatDate = (date) => {
+  if (!date) return "---";
+  return new Date(date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+};
+const formatReminderDate = (dateStr) => {
+  if (!dateStr) return "---";
+  const d = dateStr.toString().slice(0, 10);
+  const [y, m, day] = d.split("-");
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return `${day} ${months[parseInt(m,10)-1]} ${y}`;
+};
+
+const openHistory = async (lead) => {
+  setHistoryLead(lead);
+  try {
+    const [actRes, remRes] = await Promise.all([
+      axios.get(`http://localhost:3000/api/leads/activity/walkin/${lead.id}`),
+      axios.get(`http://localhost:3000/api/leads/reminders/walkin/${lead.id}`),
+    ]);
+    setHistoryActivity(actRes.data);
+    setHistoryReminders(remRes.data);
+  } catch (_) {}
+  setHistoryOpen(true);
+};
+
+const openReminderPanel = async (lead) => {
+  setReminderLeadId(lead.id); setReminderLeadName(lead.customer_name);
+  setNewReminderDate(""); setNewReminderTime(""); setNewReminderNote("");
+  try {
+    await axios.post("http://localhost:3000/api/leads/check-missed").catch(() => {});
+    const res = await axios.get(`http://localhost:3000/api/leads/reminders/walkin/${lead.id}`);
+    setLeadReminders(res.data);
+  } catch (_) { setLeadReminders([]); }
+  setReminderOpen(true);
+};
+
+const saveReminder = async () => {
+  if (!newReminderDate) return alert("Please select a date");
+  try {
+    await axios.post("http://localhost:3000/api/leads/reminders", {
+      lead_id: reminderLeadId, lead_type: "walkin",
+      reminder_date: newReminderDate, reminder_time: newReminderTime || null, reminder_notes: newReminderNote,
+    });
+    const res = await axios.get(`http://localhost:3000/api/leads/reminders/walkin/${reminderLeadId}`);
+    setLeadReminders(res.data); fetchMissedCounts();
+    setNewReminderDate(""); setNewReminderTime(""); setNewReminderNote("");
+  } catch (_) { alert("Failed to save reminder"); }
+};
+
+const deleteReminder = async (id) => {
+  await axios.delete(`http://localhost:3000/api/leads/reminders/${id}`);
+  setLeadReminders(prev => prev.filter(r => r.id !== id)); fetchMissedCounts();
+};
 
   
 // Handle Change
@@ -71,11 +149,13 @@ const saveWalkins = async (e) => {
   };
 
   if (isEdit) {
-    await axios.put(
-      `http://localhost:3000/api/Walkins/${editId}`,
-      payload
-    );
+    await axios.put(`http://localhost:3000/api/Walkins/${editId}`, payload);
     alert("Successfully Updated");
+    setForm(prev => ({
+      ...prev,
+      followup_required: "Default", followup_date: "", followup_notes: "",
+      reminder_required: "Default", reminder_date: "", reminder_notes: "",
+    }));
   } else {
     await axios.post(
       "http://localhost:3000/api/Walkins",
@@ -134,15 +214,6 @@ const openEdit = async (id) => {
   } catch (err) {
     alert("message Deleted", err)
   }
-};
-
-// Date Format
-const formatDate = (date) => {
-  return new Date(date).toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
 };
 
  useEffect(() => {
@@ -250,7 +321,17 @@ const formatDate = (date) => {
                 {/*  */}
                 <div className="grid grid-cols-4 items-center gap-6">
                    <label htmlFor="" className="text-sm text-gray-600 text-left">Staff Name</label>
-                   <input type="text" value={form.staff_name} onChange={handleChange}  name="staff_name" className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]"/>
+                   <div className="col-span-3">
+                     <select value={form.staff_name} onChange={handleChange} name="staff_name"
+                       className="border rounded-md px-3 py-2 outline-none bg-white w-full text-sm">
+                       <option value="">-- Select Staff --</option>
+                       {teamMembers.map(t => (
+                         <option key={t.id} value={`${t.first_name} ${t.last_name || ""}`.trim()}>
+                           {t.first_name} {t.last_name || ""} {t.job_title ? `(${t.job_title})` : ""}
+                         </option>
+                       ))}
+                     </select>
+                   </div>
                 </div>
 
                 {/* Reference */}
@@ -287,7 +368,7 @@ const formatDate = (date) => {
          {/* DROPDOWN OPTIONS */}
               {outcomeOpen && (
                  <div className="absolute left-0 right-0 bg-white border rounded-md mt-1 shadow-lg z-20">
-                 {["New", "Converted", "Disqualified"].map((outcome) => (
+                 {["New", "Hot Case", "Warm Case", "Cold Case", "Not Required", "Converted"].map((outcome) => (
            <div
              key={outcome}
              onClick={() => {
@@ -304,149 +385,59 @@ const formatDate = (date) => {
    </div>
    </div>
 
-    {/* Follw Up */}
-        <div className="flex justify-between items-center text-sm text-gray-600 more">
-                 <span className="text-black font-[Times-Roman-Serif] text-[22px]">More Details</span>
-                 <label className="relative inline-flex items-center cursor-pointer">
-                   <input type="checkbox" className="sr-only peer"  checked={showMoreDetails}
-                     onChange={() => setShowMoreDetails(!showMoreDetails)} />
-                   <div className="w-10 h-5 bg-gray-300 rounded-full peer peer-checked:bg-blue-500 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:h-4 after:w-4 after:rounded-full after:transition peer-checked:after:translate-x-5"></div>
-                 </label>
+   {/* ── Follow-up & Reminder ── */}
+               <div className="border-t pt-4 mt-2">
+                 <div className="flex justify-between items-center mb-3">
+                   <span className="text-sm font-bold text-gray-700">Follow-up & Reminder</span>
+                   <label className="relative inline-flex items-center cursor-pointer">
+                     <input type="checkbox" className="sr-only peer" checked={showMoreDetails} onChange={() => setShowMoreDetails(!showMoreDetails)} />
+                     <div className="w-10 h-5 bg-gray-300 rounded-full peer peer-checked:bg-blue-500 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:h-4 after:w-4 after:rounded-full after:transition peer-checked:after:translate-x-5"></div>
+                   </label>
+                 </div>
+                 {showMoreDetails && (
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                     <div className="border border-blue-200 rounded-xl p-4 bg-blue-50/40">
+                       <div className="flex items-center gap-2 mb-3"><div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div><span className="text-xs font-bold text-blue-700 uppercase tracking-wide">Follow-up</span></div>
+                       <div className="space-y-3">
+                         <div>
+                           <label className="text-xs font-semibold text-gray-500">Required</label>
+                           <div className="relative mt-1">
+                             <input type="text" readOnly value={form.followup_required} onClick={() => setFollowOpen(!followOpen)} className="border rounded-lg px-3 py-2 outline-none w-full cursor-pointer bg-white text-sm" />
+                             <ChevronDown size={15} className={`absolute top-3 right-3 cursor-pointer transition-transform ${followOpen ? "rotate-180" : ""}`} onClick={() => setFollowOpen(!followOpen)} />
+                             {followOpen && (<div className="absolute left-0 right-0 bg-white border rounded-lg mt-1 shadow-lg z-20">{["Yes","No"].map(o => (<div key={o} onClick={() => { setForm({...form, followup_required: o}); setFollowOpen(false); }} className="px-3 py-2 cursor-pointer hover:bg-blue-600 hover:text-white text-sm">{o}</div>))}</div>)}
+                           </div>
+                         </div>
+                         <div><label className="text-xs font-semibold text-gray-500">Date</label><input type="date" value={form.followup_date} onChange={handleChange} name="followup_date" className="border rounded-lg px-3 py-2 outline-none bg-white w-full text-sm mt-1" /></div>
+                         <div><label className="text-xs font-semibold text-gray-500">Notes</label><textarea value={form.followup_notes} onChange={handleChange} name="followup_notes" rows={2} placeholder="Follow-up notes..." className="border rounded-lg px-3 py-2 outline-none bg-white w-full text-sm mt-1 resize-none" /></div>
+                       </div>
+                     </div>
+                     <div className="border border-yellow-200 rounded-xl p-4 bg-yellow-50/40">
+                       <div className="flex items-center gap-2 mb-3"><div className="w-2.5 h-2.5 rounded-full bg-yellow-500"></div><span className="text-xs font-bold text-yellow-700 uppercase tracking-wide">Reminder</span></div>
+                       <div className="space-y-3">
+                         <div>
+                           <label className="text-xs font-semibold text-gray-500">Required</label>
+                           <div className="relative mt-1">
+                             <input type="text" readOnly value={form.reminder_required} onClick={() => setRemainderDetails(!remainderDetails)} className="border rounded-lg px-3 py-2 outline-none w-full cursor-pointer bg-white text-sm" />
+                             <ChevronDown size={15} className={`absolute top-3 right-3 cursor-pointer transition-transform ${remainderDetails ? "rotate-180" : ""}`} onClick={() => setRemainderDetails(!remainderDetails)} />
+                             {remainderDetails && (<div className="absolute left-0 right-0 bg-white border rounded-lg mt-1 shadow-lg z-20">{["Yes","No"].map(o => (<div key={o} onClick={() => { setForm({...form, reminder_required: o}); setRemainderDetails(false); }} className="px-3 py-2 cursor-pointer hover:bg-yellow-500 hover:text-white text-sm">{o}</div>))}</div>)}
+                           </div>
+                         </div>
+                         <div><label className="text-xs font-semibold text-gray-500">Date</label><input type="date" value={form.reminder_date} onChange={handleChange} name="reminder_date" className="border rounded-lg px-3 py-2 outline-none bg-white w-full text-sm mt-1" /></div>
+                         <div><label className="text-xs font-semibold text-gray-500">Notes</label><textarea value={form.reminder_notes} onChange={handleChange} name="reminder_notes" rows={2} placeholder="Reminder notes..." className="border rounded-lg px-3 py-2 outline-none bg-white w-full text-sm mt-1 resize-none" /></div>
+                       </div>
+                     </div>
+                   </div>
+                 )}
                </div>
-
-      {showMoreDetails && (
-                 <div className="items-center pt-[50px] h-auto">
-                   <div className="pb-[20px]">
-                    <div className=" flex items-center gap-2">
-                      <label className="text-sm text-gray-600 text-left ">Follow Up </label>
-                      <div className="relative left-[60px]">
-         {/* INPUT */}
-                       <input type="text" required readOnly value={form.followup_required} name="followup_required" placeholder="Select Follow Up"   onClick={() => setFollowOpen(!followOpen)}
-                       className="border rounded-md px-3 py-2 outline-none w-full cursor-pointer "/>
-     
-         {/* ICON */}
-                      <ChevronDown
-                        size={18}
-                        className={`absolute top-3.5 right-4 cursor-pointer transition-transform duration-300 ${
-                        followOpen ? "rotate-180" : ""
-                          }`}
-                       onClick={() => setFollowOpen(!followOpen)} />
-     
-              {/* DROPDOWN OPTIONS */}
-                   {followOpen && (
-                      <div className="absolute left-0 right-0 bg-white border rounded-md mt-1 shadow-lg z-20">
-                      {["Yes","No"].map((outcome) => (
-               <div
-                 key={outcome}
-                 onClick={() => {
-                   setForm({ ...form, followup_required:outcome });
-                   setFollowOpen(false);
-                 }}
-                 className="px-3 py-2 cursor-pointer hover:bg-blue-600 hover:text-white text-left"
-               >
-                 {outcome}
-               </div>
-             ))}
-           </div>
-         )}
-       </div>
-
-        <div className="flex items-center gap-10 relative left-[80px]">
-            <label htmlFor="" className="text-sm text-gray-600 w-[110px] whitespace-nowrap ml-[10px]">Followup Date</label>
-            <input type="Date" required value={form.followup_date} onChange={handleChange} name="followup_date" className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]" />
-          </div>
-       </div>
-
-        <div className="flex items-center gap-4 mt-[25px]">
-             <label className="text-sm text-gray-600 w-[110px] whitespace-nowrap">
-               Followup Notes <span className="text-red-500">*</span>
-             </label>
-     
-             <input
-               type="text"
-               required
-               onChange={handleChange}
-               value={form.followup_notes}
-               name="followup_notes"
-               className="border outline-none rounded-md px-3 py-2 w-[200px] bg-white ml-[20px]"
-             />
-           </div>
-     
-           {/* Remainder */}
-                    <div className="items-center more mt-6">
-                    <div className=" flex items-center gap-2">
-                      <label className="text-sm text-gray-600 text-left ">Remainder Up </label>
-                      <div className="relative left-[30px]">
-         {/* INPUT */}
-                       <input type="text" readOnly value={form.reminder_required} name="reminder_required" placeholder="Select Follow Up"   onClick={() => setRemainderDetails(!remainderDetails)}
-                       className="border rounded-md px-3 py-2 outline-none w-full cursor-pointer "/>
-     
-         {/* ICON */}
-                      <ChevronDown
-                        size={18}
-                        className={`absolute top-3.5 right-4 cursor-pointer transition-transform duration-300 ${
-                        remainderDetails ? "rotate-180" : ""
-                          }`}
-                       onClick={() => setRemainderDetails(!remainderDetails)} />
-     
-              {/* DROPDOWN OPTIONS */}
-                   {remainderDetails && (
-                      <div className="absolute left-0 right-0 bg-white border rounded-md mt-1 shadow-lg z-20">
-                      {["Yes","No"].map((outcome) => (
-               <div
-                  key={outcome}
-                  onClick={() => {
-                  setForm({ ...form, reminder_required:outcome });
-                  setRemainderDetails(false);
-                 }}
-                 className="px-3 py-2 cursor-pointer hover:bg-blue-600 hover:text-white text-left"
-               >
-                 {outcome}
-               </div>
-             ))}
-           </div>
-         )} 
-       </div>
-        <div className="flex items-center gap-10 relative left-[50px]">
-            <label htmlFor="" className="text-sm text-gray-600 w-[110px] whitespace-nowrap ml-[10px]">Remainder Date</label>
-            <input type="Date" value={form.reminder_date} onChange={handleChange} name="reminder_date" className="col-span-3 border rounded-md px-3 py-2 outline-none bg-white w-[100%]" />
-          </div>
-       </div>
-        <div className="flex items-center gap-4 mt-[25px]">
-             <label className="text-sm text-gray-600 w-[110px] whitespace-nowrap">
-               Remainder Notes
-             </label>
-     
-             <input
-               type="text"
-               onChange={handleChange}
-               value={form.reminder_notes}
-               name="reminder_notes"
-               className="border outline-none rounded-md px-3 py-2 w-[200px] bg-white ml-[20px]"
-             />
-           </div>
-       </div>   
-       </div>
-       </div>    
-       
-       )}
 
   {/* submit and  close */}
       <div className="flex gap-4 pt-4 more2">
-                <button
-                  type="submit"
-                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
-                >
-                  Submit
+                <button type="submit" className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">Submit</button>
+                <button type="button" className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 flex items-center gap-2"
+                  onClick={() => { sessionStorage.setItem("qt_prefill", JSON.stringify({ customer_name: form.customer_name, mobile_number: form.mobile_number, email: form.email || "", location_city: form.location_city, lead_id: editId || null, lead_type: "walkin" })); window.location.href = "/dashboard/proposal"; }}>
+                  <FileText size={15} /> Create Quotation
                 </button>
-
-                <button
-                  onClick={() => setOpen(false)}
-                  type="button"
-                  className="bg-gray-400 text-white px-6 py-2 rounded-lg hover:bg-red-500"
-                >
-                  Close
-                </button>
+                <button onClick={() => setOpen(false)} type="button" className="bg-gray-400 text-white px-6 py-2 rounded-lg hover:bg-red-500">Close</button>
               </div>
    </form>
    
@@ -454,83 +445,135 @@ const formatDate = (date) => {
   </div>
   {/* Tables */}
          <div className="bg-white shadow rounded-xl overflow-x-auto mt-5 ">
-          <table className="w-full text-sm border border-gray-300 table-fixed w-[140%]">
+          <table className="w-full text-sm border border-gray-300">
             <thead className="bg-[#f8faf9]">
               <tr className="text-black font-[Times-New-Roman] uppercase text-xs ">
                 <th className="border px-4 py-3 w-[50px] text-center">ID</th>
                 <th className="border px-4 py-3">Customer Name</th>
                 <th className="border px-4 py-3">Mobile Number</th>
-                <th className="border px-4 py-3">City</th>
                 <th className="border px-4 py-3 w-[140px]">Walkin Date</th>
-                <th className="border px-4 py-3">Service</th>
                 <th className="border px-4 py-3">Staff</th>
-                <th className="border px-4 py-3">Reference</th>
-               
-                <th className="border px-4 py-3">Outcome Status</th>
-                <th className="border px-4 py-3 w-[90px] text-center">Actions</th>
+                <th className="border px-4 py-3">Status</th>
+                <th className="border px-4 py-3 w-[130px] text-center">Actions</th>
               </tr>
             </thead>
-        
             <tbody className="text-sm font-[Times-New-Roman] text-center">
-              {Walkings.filter(W => W.customer_name?.toLowerCase().includes(searchTerm.toLowerCase())).map((W) => (
-                <tr
-                  key={W.id}
-                  className="hover:bg-gray-100 hover:text-black transition"
-                >
-                  <td className="border px-4 py-2 text-center">
-                    {W.id}
-                  </td>
-                  <td className="border px-4 py-2 ">
-                    {W.customer_name}
-                  </td>
-                  <td className="border px-4 py-2 whitespace-nowrap">
-                    {W.mobile_number}
-                  </td>
-                  <td className="border px-4 py-2 truncate">
-                    {W.location_city}
-                  </td>
-                  <td className="border px-4 py-2 ">
-                    {formatDate(W.walkin_date)}
-                  </td>
+              {Walkings.filter(W => W.customer_name?.toLowerCase().includes(searchTerm.toLowerCase())).map((W) => {
+                const statusColors = {
+                  "New": "bg-gray-100 text-gray-700", "Hot Case": "bg-red-100 text-red-700",
+                  "Warm Case": "bg-orange-100 text-orange-700", "Cold Case": "bg-blue-100 text-blue-700",
+                  "Not Required": "bg-gray-200 text-gray-500", "Converted": "bg-green-100 text-green-700",
+                  "Disqualified": "bg-red-100 text-red-700",
+                };
+                const missed = missedCounts[W.id] || 0;
+                return (
+                <tr key={W.id} className="hover:bg-gray-100 hover:text-black transition">
+                  <td className="border px-4 py-2 text-center">{W.id}</td>
+                  <td className="border px-4 py-2 text-left font-medium">{W.customer_name}</td>
+                  <td className="border px-4 py-2 whitespace-nowrap">{W.mobile_number}</td>
+                  <td className="border px-4 py-2">{formatDate(W.walkin_date)}</td>
+                  <td className="border px-4 py-2">{W.staff_name || "---"}</td>
                   <td className="border px-4 py-2">
-                    {W.purpose}
-                  </td>
-                  <td className="border px-4 py-2 truncate">
-                    {W.staff_name}
-                  </td>
-                  <td className="border px-4 py-2">
-                    {W.reference}
-                  </td>
-                
-                  <td className="border px-4 py-2">
-                    {W.walkin_status}
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${statusColors[W.walkin_status] || "bg-gray-100 text-gray-600"}`}>{W.walkin_status}</span>
                   </td>
                   <td className="border px-4 py-2 text-center">
-                    <div className="flex justify-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => deletefield(W.id)}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        <Trash2 size={16} />
+                    <div className="flex justify-center gap-1.5 items-center">
+                      <button type="button" onClick={() => openReminderPanel(W)} title="Reminders" className="relative text-yellow-500 hover:text-yellow-700">
+                        <Bell size={16} />
+                        {missed > 0 && <span className={`absolute -top-1.5 -right-1.5 text-[9px] font-black px-1 rounded-full text-white ${missed >= 3 ? "bg-red-600" : "bg-orange-500"}`}>{missed}</span>}
                       </button>
-        
-                      <button
-                        type="button"
-                        onClick={() => openEdit(W.id)}
-                        className="text-green-600 hover:text-green-800"
-                      >
-                        <Edit size={16} />
-                      </button>
+                      <button type="button" onClick={() => openHistory(W)} title="History" className="text-indigo-500 hover:text-indigo-700"><History size={16} /></button>
+                      <button type="button" onClick={() => openEdit(W.id)} title="Edit" className="text-green-600 hover:text-green-800"><Edit size={16} /></button>
+                      <button type="button" onClick={() => deletefield(W.id)} title="Delete" className="text-red-500 hover:text-red-700"><Trash2 size={16} /></button>
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
         
   </div>
+
+   {/* History Modal */}
+   {historyOpen && historyLead && (
+     <div className="fixed inset-0 z-50 bg-black/40 flex justify-center items-start overflow-y-auto pt-10 pb-10">
+       <div className="bg-white rounded-xl shadow-2xl w-[95%] max-w-2xl p-6">
+         <div className="flex justify-between items-center mb-4 border-b pb-3">
+           <div><h2 className="text-lg font-bold text-gray-800 flex items-center gap-2"><History size={18} className="text-indigo-500" /> Lead History</h2><p className="text-sm text-indigo-600 font-semibold">{historyLead.customer_name} · {historyLead.mobile_number}</p></div>
+           <X className="cursor-pointer text-gray-400 hover:text-red-500" onClick={() => setHistoryOpen(false)} />
+         </div>
+         <div className="grid grid-cols-2 gap-2 text-sm bg-gray-50 rounded-xl p-4 mb-5 border">
+           <div><span className="text-gray-400 text-xs font-semibold uppercase">Status</span><div className="mt-0.5"><span className="px-2 py-0.5 rounded-full text-xs font-bold bg-gray-100 text-gray-700">{historyLead.walkin_status}</span></div></div>
+           <div><span className="text-gray-400 text-xs font-semibold uppercase">Staff</span><div className="mt-0.5 font-medium">{historyLead.staff_name || "---"}</div></div>
+           <div><span className="text-gray-400 text-xs font-semibold uppercase">Purpose</span><div className="mt-0.5">{historyLead.purpose || "---"}</div></div>
+           <div><span className="text-gray-400 text-xs font-semibold uppercase">City</span><div className="mt-0.5">{historyLead.location_city || "---"}</div></div>
+           <div><span className="text-gray-400 text-xs font-semibold uppercase">Reference</span><div className="mt-0.5">{historyLead.reference || "---"}</div></div>
+           <div><span className="text-gray-400 text-xs font-semibold uppercase">Walkin Date</span><div className="mt-0.5">{formatDate(historyLead.walkin_date)}</div></div>
+         </div>
+         <div className="mb-5">
+           <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2"><Bell size={13} className="text-yellow-500" /> Reminder Log <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">{historyReminders.length}</span></h3>
+           {historyReminders.length === 0 ? <p className="text-xs text-gray-400 italic bg-gray-50 rounded-lg p-3">No reminders set.</p> : (
+             <div className="space-y-2">{historyReminders.map((r, idx) => (
+               <div key={r.id} className={`flex items-center gap-3 p-3 rounded-lg border text-sm ${r.status === "Missed" ? "bg-red-50 border-red-200" : r.status === "Done" ? "bg-green-50 border-green-200" : "bg-blue-50 border-blue-200"}`}>
+                 <div className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white bg-gray-400">{idx+1}</div>
+                 <div className="flex-1"><div className="font-semibold text-gray-800">{formatReminderDate(r.reminder_date)}{r.reminder_time ? ` · ${r.reminder_time.slice(0,5)}` : ""}</div>{r.reminder_notes && <div className="text-gray-500 text-xs mt-0.5">{r.reminder_notes}</div>}</div>
+                 <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${r.status === "Missed" ? "bg-red-600 text-white" : r.status === "Done" ? "bg-green-600 text-white" : "bg-blue-600 text-white"}`}>{r.status}</span>
+               </div>
+             ))}</div>
+           )}
+         </div>
+         <div>
+           <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2"><Clock size={13} className="text-blue-500" /> Activity Timeline <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">{historyActivity.length}</span></h3>
+           {historyActivity.length === 0 ? <p className="text-xs text-gray-400 italic bg-gray-50 rounded-lg p-3">No activity recorded.</p> : (
+             <div className="relative"><div className="absolute left-3 top-0 bottom-0 w-0.5 bg-gray-200"></div>
+               <div className="space-y-3 pl-8">{historyActivity.map(a => {
+                 const c = a.action === "Lead Created" ? "bg-green-500" : a.action === "Status Updated" ? "bg-blue-500" : a.action === "Follow-up Scheduled" ? "bg-indigo-500" : "bg-yellow-500";
+                 return (<div key={a.id} className="relative"><div className={`absolute -left-5 w-3 h-3 rounded-full ${c} border-2 border-white`}></div>
+                   <div className="bg-gray-50 rounded-lg p-3 border"><div className="flex justify-between items-start"><span className="font-semibold text-sm text-gray-800">{a.action}</span><span className="text-xs text-gray-400 ml-2">{new Date(a.created_at).toLocaleString("en-IN",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"})}</span></div>{a.details && <p className="text-xs text-gray-500 mt-1">{a.details}</p>}</div>
+                 </div>);
+               })}</div>
+             </div>
+           )}
+         </div>
+       </div>
+     </div>
+   )}
+
+   {/* Reminder Panel */}
+   {reminderOpen && (
+     <div className="fixed inset-0 z-50 bg-black/40 flex justify-center items-start overflow-y-auto pt-10 pb-10">
+       <div className="bg-white rounded-xl shadow-2xl w-[95%] max-w-lg p-6">
+         <div className="flex justify-between items-center mb-4 border-b pb-3">
+           <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2"><Bell size={18} className="text-yellow-500" /> Reminders — {reminderLeadName}</h2>
+           <X className="cursor-pointer text-gray-400 hover:text-red-500" onClick={() => setReminderOpen(false)} />
+         </div>
+         <div className="bg-gray-50 rounded-lg p-4 mb-4 space-y-3">
+           <p className="text-xs font-bold text-gray-500 uppercase">Set New Reminder</p>
+           <div className="grid grid-cols-2 gap-3">
+             <div><label className="text-xs text-gray-500 font-semibold">Date *</label><input type="date" value={newReminderDate} onChange={e => setNewReminderDate(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm outline-none mt-1" /></div>
+             <div><label className="text-xs text-gray-500 font-semibold">Time</label><input type="time" value={newReminderTime} onChange={e => setNewReminderTime(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm outline-none mt-1" /></div>
+           </div>
+           <div><label className="text-xs text-gray-500 font-semibold">Note</label><input type="text" value={newReminderNote} onChange={e => setNewReminderNote(e.target.value)} placeholder="e.g. Call back about pricing" className="w-full border rounded-lg px-3 py-2 text-sm outline-none mt-1" /></div>
+           <button onClick={saveReminder} className="w-full bg-yellow-500 text-white py-2 rounded-lg font-bold hover:bg-yellow-600 text-sm">+ Add Reminder</button>
+         </div>
+         <p className="text-xs font-bold text-gray-500 uppercase mb-2">Existing Reminders</p>
+         {leadReminders.length === 0 ? <p className="text-xs text-gray-400 italic">No reminders yet.</p> : (
+           <div className="space-y-2">{leadReminders.map(r => (
+             <div key={r.id} className={`flex items-center justify-between p-3 rounded-lg border text-sm ${r.status === "Missed" ? "bg-red-50 border-red-200" : r.status === "Done" ? "bg-green-50 border-green-200" : "bg-blue-50 border-blue-200"}`}>
+               <div><div className="font-semibold">{formatReminderDate(r.reminder_date)}{r.reminder_time ? ` at ${r.reminder_time.slice(0,5)}` : ""}</div>{r.reminder_notes && <div className="text-gray-500 text-xs mt-0.5">{r.reminder_notes}</div>}</div>
+               <div className="flex items-center gap-2">
+                 <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${r.status === "Missed" ? "bg-red-600 text-white" : r.status === "Done" ? "bg-green-600 text-white" : "bg-blue-600 text-white"}`}>{r.status}</span>
+                 {r.status === "Pending" && <button onClick={() => { axios.put(`http://localhost:3000/api/leads/reminders/${r.id}`, {status:"Done"}); setLeadReminders(prev => prev.map(x => x.id===r.id ? {...x,status:"Done"} : x)); }} className="text-xs bg-green-600 text-white px-2 py-0.5 rounded font-bold">Done</button>}
+                 <button onClick={() => deleteReminder(r.id)} className="text-red-400 hover:text-red-600"><Trash2 size={13} /></button>
+               </div>
+             </div>
+           ))}</div>
+         )}
+       </div>
+     </div>
+   )}
 
      </center>
     )

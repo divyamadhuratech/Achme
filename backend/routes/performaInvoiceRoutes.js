@@ -2,27 +2,44 @@ const express = require("express");
 const router = express.Router();
 const db = require("../config/database");
 
-// GET ALL PERFORMA INVOICES
+// GET ALL PERFORMA INVOICES (latest versions only)
 router.get("/", (req, res) => {
   const sql = `
     SELECT
-      p.id,
-      p.invoice_date,
-      p.grand_total,
-      c.customer_name,
-      c.mobile_number,
+      p.id, p.invoice_date, p.grand_total, p.version, p.parent_id,
+      c.customer_name, c.mobile_number,
       COALESCE(p.client_city, c.location_city) AS location_city,
       c.email,
       MIN(pi.description) AS description
     FROM performainvoices p
     JOIN customers c ON c.id = p.customer_id
     LEFT JOIN performainvoice_items pi ON pi.invoice_id = p.id
+    WHERE p.is_latest = 1
     GROUP BY p.id
-    ORDER BY p.id ASC
+    ORDER BY p.id DESC
   `;
   db.query(sql, (err, rows) => {
     if (err) return res.status(500).json(err);
     res.json(rows);
+  });
+});
+
+// GET previous versions (history) for a given invoice id
+router.get("/version-history/:id", (req, res) => {
+  const sql = `
+    SELECT p.id, p.invoice_date, p.grand_total, p.version, p.is_latest, p.parent_id,
+           c.customer_name, c.mobile_number, c.email,
+           COALESCE(p.client_city, c.location_city) AS location_city
+    FROM performainvoices p
+    JOIN customers c ON c.id = p.customer_id
+    WHERE p.is_latest = 0
+      AND (p.parent_id = ? OR p.id = (SELECT parent_id FROM performainvoices WHERE id = ?)
+           OR p.parent_id = (SELECT parent_id FROM performainvoices WHERE id = ? AND parent_id IS NOT NULL))
+    ORDER BY p.version DESC, p.id DESC`;
+  db.query(sql, [req.params.id, req.params.id, req.params.id], (err, rows) => {
+    if (err) return res.status(500).json(err);
+    const seen = new Set();
+    res.json(rows.filter(r => { if (seen.has(r.id)) return false; seen.add(r.id); return true; }));
   });
 });
 
@@ -174,11 +191,11 @@ router.post("/create", (req, res) => {
   });
 });
 
-// Update
+// Update — creates a NEW version, preserving history
 router.put("/:id", (req, res) => {
   const error = validateInvoice(req.body);
   if (error) return res.status(400).json({ message: error });
-  
+
   const { id } = req.params;
   const { customer, performaInvoice, items, extra } = req.body;
   const ex = extra || {};
@@ -186,6 +203,7 @@ router.put("/:id", (req, res) => {
   db.beginTransaction(err => {
     if (err) return res.status(500).json(err);
 
+    // Update customer
     db.query(
       `UPDATE customers SET customer_name=?, mobile_number=?, email=?, gst_number=?, location_city=?
        WHERE id = (SELECT customer_id FROM performainvoices WHERE id=?)`,
@@ -193,62 +211,71 @@ router.put("/:id", (req, res) => {
       err => {
         if (err) return db.rollback(() => res.status(500).json(err));
 
-        db.query(
-          `UPDATE performainvoices SET
-           invoice_date=?, subtotal=?, total_cgst=?, total_sgst=?, total_igst=?, total_tax=?, total_discount=?, grand_total=?,
-           from_address_id=?, from_address_custom=?,
-           client_company=?, client_address1=?, client_address2=?, client_city=?, client_state=?, client_pincode=?, client_country=?,
-           tax_type=?, custom_tax=?,
-           exec_name=?, exec_phone=?, exec_email=?,
-           terms_general=?, terms_tax=?, terms_project_period=?, terms_validity=?, terms_separate_orders=?,
-           terms_payment=?, terms_payment_custom=?, terms_warranty=?,
-           hsn_sac_code=?, supplier_branch=?,
-           bank_details_id=?, bank_company=?, bank_name=?, bank_account=?, bank_ifsc=?, bank_branch=?, custom_terms=?
-           WHERE id=?`,
-          [
-            performaInvoice.invoice_date, performaInvoice.subtotal, performaInvoice.total_cgst || 0,
-            performaInvoice.total_sgst || 0, performaInvoice.total_igst || 0,
-            (performaInvoice.total_cgst || 0) + (performaInvoice.total_sgst || 0) + (performaInvoice.total_igst || 0),
-            performaInvoice.total_discount, performaInvoice.grand_total,
-            ex.from_address_id || null, ex.from_address_custom || null,
-            ex.client_company || null, ex.client_address1 || null, ex.client_address2 || null,
-            ex.client_city || null, ex.client_state || null, ex.client_pincode || null, ex.client_country || "India",
-            ex.tax_type || "GST18", ex.custom_tax || null,
-            ex.exec_name || null, ex.exec_phone || null, ex.exec_email || null,
-            ex.terms_general ? 1 : 0, ex.terms_tax ? 1 : 0, ex.terms_project_period || null,
-            ex.terms_validity || ex.terms_validity_days || null, ex.terms_separate_orders ? JSON.stringify(ex.terms_separate_orders) : null,
-            ex.terms_payment || null, ex.terms_payment_custom || null, ex.terms_warranty || null,
-            ex.hsn_sac_code || null, ex.supplier_branch || null,
-            ex.bank_details_id || null, ex.bank_company || null, ex.bank_name || null, ex.bank_account || null, ex.bank_ifsc || null, ex.bank_branch || null, ex.custom_terms || null,
-            id
-          ],
-          err => {
+        // Get current record info
+        db.query(`SELECT customer_id, parent_id, version, reference_no FROM performainvoices WHERE id=?`, [id], (err, rows) => {
+          if (err || !rows.length) return db.rollback(() => res.status(500).json(err || { message: "Not found" }));
+
+          const current = rows[0];
+          const rootId = current.parent_id || id;
+          const newVersion = (current.version || 1) + 1;
+
+          // Mark all previous versions as not latest
+          db.query(`UPDATE performainvoices SET is_latest=0 WHERE id=? OR parent_id=?`, [rootId, rootId], err => {
             if (err) return db.rollback(() => res.status(500).json(err));
 
-            db.query(`DELETE FROM performainvoice_items WHERE invoice_id=?`, [id], err => {
-              if (err) return db.rollback(() => res.status(500).json(err));
+            // Insert new version
+            db.query(
+              `INSERT INTO performainvoices
+               (customer_id, invoice_date, total_cgst, total_sgst, total_igst, subtotal, total_tax, total_discount, grand_total,
+                reference_no, from_address_id, from_address_custom,
+                client_company, client_address1, client_address2, client_city, client_state, client_pincode, client_country,
+                tax_type, custom_tax, exec_name, exec_phone, exec_email,
+                terms_general, terms_tax, terms_project_period, terms_validity, terms_separate_orders,
+                terms_payment, terms_payment_custom, terms_warranty,
+                hsn_sac_code, supplier_branch, bank_details_id, bank_company, bank_name, bank_account, bank_ifsc, bank_branch, custom_terms,
+                parent_id, version, is_latest)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+              [
+                current.customer_id, performaInvoice.invoice_date,
+                performaInvoice.total_cgst || 0, performaInvoice.total_sgst || 0, performaInvoice.total_igst || 0,
+                performaInvoice.subtotal || 0,
+                (performaInvoice.total_cgst || 0) + (performaInvoice.total_sgst || 0) + (performaInvoice.total_igst || 0),
+                performaInvoice.total_discount || 0, performaInvoice.grand_total || 0,
+                current.reference_no, ex.from_address_id || null, ex.from_address_custom || null,
+                ex.client_company || null, ex.client_address1 || null, ex.client_address2 || null,
+                ex.client_city || null, ex.client_state || null, ex.client_pincode || null, ex.client_country || "India",
+                ex.tax_type || "GST18", ex.custom_tax || null,
+                ex.exec_name || null, ex.exec_phone || null, ex.exec_email || null,
+                ex.terms_general ? 1 : 0, ex.terms_tax ? 1 : 0, ex.terms_project_period || null,
+                ex.terms_validity || null, ex.terms_separate_orders ? JSON.stringify(ex.terms_separate_orders) : null,
+                ex.terms_payment || null, ex.terms_payment_custom || null, ex.terms_warranty || null,
+                ex.hsn_sac_code || null, ex.supplier_branch || null,
+                ex.bank_details_id || null, ex.bank_company || null, ex.bank_name || null, ex.bank_account || null, ex.bank_ifsc || null, ex.bank_branch || null, ex.custom_terms || null,
+                rootId, newVersion, 1
+              ],
+              (err, result) => {
+                if (err) return db.rollback(() => res.status(500).json(err));
+                const newId = result.insertId;
 
-              const values = items.map((item, index) => [
-                id, index + 1, item.description, item.price, item.quantity, item.tax, item.discount, item.subtotal,
-                item.brand_model || null, item.hsn_sac || null, item.uom || "Nos"
-              ]);
-
-              db.query(
-                `INSERT INTO performainvoice_items
-                 (invoice_id, product_number, description, price, quantity, tax, discount, subtotal, brand_model, hsn_sac, uom)
-                 VALUES ?`,
-                [values],
-                err => {
-                  if (err) return db.rollback(() => res.status(500).json(err));
-                  db.commit(err => {
+                const values = items.map((item, index) => [
+                  newId, index + 1, item.description, item.price, item.quantity, item.tax, item.discount, item.subtotal,
+                  item.brand_model || null, item.hsn_sac || null, item.uom || "Nos"
+                ]);
+                db.query(
+                  `INSERT INTO performainvoice_items (invoice_id, product_number, description, price, quantity, tax, discount, subtotal, brand_model, hsn_sac, uom) VALUES ?`,
+                  [values],
+                  err => {
                     if (err) return db.rollback(() => res.status(500).json(err));
-                    res.json({ message: "Updated successfully" });
-                  });
-                }
-              );
-            });
-          }
-        );
+                    db.commit(err => {
+                      if (err) return db.rollback(() => res.status(500).json(err));
+                      res.json({ message: "New version saved", newId, version: newVersion });
+                    });
+                  }
+                );
+              }
+            );
+          });
+        });
       }
     );
   });
@@ -278,6 +305,30 @@ router.delete("/:id", (req, res) => {
 // SEND EMAIL
 const nodemailer = require("nodemailer");
 const { generateInvoicePdf } = require("../backendutil/generateInvoicePdf");
+
+// Download PDF directly
+router.get("/download-pdf/:id", async (req, res) => {
+  const { id } = req.params;
+  const headerSql = `SELECT p.*, c.email, c.customer_name, c.mobile_number, c.location_city, c.gst_number,
+    COALESCE(p.from_address_custom, fa.address) AS resolved_from_address
+    FROM performainvoices p JOIN customers c ON p.customer_id = c.id
+    LEFT JOIN pi_from_addresses fa ON fa.id = p.from_address_id WHERE p.id = ?`;
+  const itemsSql = `SELECT product_number, description, brand_model, hsn_sac, uom, price, quantity, tax, discount, subtotal FROM performainvoice_items WHERE invoice_id = ? ORDER BY product_number`;
+  db.query(headerSql, [id], (err, headerRows) => {
+    if (err || !headerRows.length) return res.status(404).json({ message: "Not found" });
+    db.query(itemsSql, [id], async (err, items) => {
+      if (err) return res.status(500).json(err);
+      try {
+        const pdfBuffer = await generateInvoicePdf({ invoice: headerRows[0], items, type: "proforma" });
+        const year = new Date(headerRows[0].invoice_date).getFullYear();
+        const filename = `ProformaInvoice_PI-${year}-${String(headerRows[0].id).padStart(3,"0")}.pdf`;
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+        res.send(pdfBuffer);
+      } catch (e) { res.status(500).json({ message: e.message }); }
+    });
+  });
+});
 
 router.post("/send-email/:id", (req, res) => {
   const { id } = req.params;

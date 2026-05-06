@@ -1,12 +1,12 @@
 import { Outlet, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { useState, createContext, useContext } from "react";
+import { useState, createContext, useContext, useEffect } from "react";
+import axios from "axios";
 
 import Topbar from "../components/navbar";
 import AdminSidebar from "../sidebars/adminsidebar";
 import UserSidebar from "../sidebars/usersidebar";
 
-// Context to pass dashboard search query to the dashboard page
 export const DashboardSearchContext = createContext("");
 export const ReminderContext = createContext({ setReminderData: () => {}, setReminderNotes: () => {} });
 
@@ -16,7 +16,22 @@ export default function DashboardLayout() {
   const [searchQuery, setSearchQuery] = useState("");
   const [reminderData, setReminderData] = useState(null);
   const [reminderNotes, setReminderNotes] = useState(null);
+  const [escalations, setEscalations] = useState([]);
   const location = useLocation();
+
+  // Fetch escalations for navbar badge — must be before any conditional return
+  useEffect(() => {
+    const fetchEscalations = async () => {
+      try {
+        await axios.post("http://localhost:3000/api/leads/check-missed");
+        const res = await axios.get("http://localhost:3000/api/leads/escalations");
+        setEscalations(res.data);
+      } catch (_) {}
+    };
+    fetchEscalations();
+    const interval = setInterval(fetchEscalations, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   if (!user) return <Navigate to="/login" />;
 
@@ -33,6 +48,8 @@ export default function DashboardLayout() {
           onSearch={setSearchQuery}
           reminderData={reminderData}
           reminderNotes={reminderNotes}
+          escalationCount={escalations.length}
+          escalations={escalations}
         />
       </div>
 

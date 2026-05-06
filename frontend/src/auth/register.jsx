@@ -41,19 +41,11 @@ const API = "http://localhost:3000";
 //  Register
 
    const submit = async () => {
-    if (!form.otp) {
-      alert("Please enter OTP");
-      return;
-    }
-
-    if (form.user_password.length < 6) {
-      alert("Password must be at least 6 characters");
-      return;
-    }
-
+    if (!form.otp) { alert("Please enter OTP"); return; }
+    if (form.user_password.length < 6) { alert("Password must be at least 6 characters"); return; }
     try {
       await axios.post(`${API}/api/auth/register`, form);
-      alert("Registration successful");
+      alert("Registration submitted! Your account is pending admin approval. You will be notified once approved.");
       navigate("/login");
     } catch (err) {
       alert(err.response?.data?.message || "Register failed");

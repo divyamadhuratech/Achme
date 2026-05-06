@@ -32,6 +32,7 @@ import Clients from "./pages/clients";
 import PerformaInvoice from "./pages/performainvoice";
 import Reports from "./pages/reports";
 import InvoicePreview from "./pages/invoicepreview";
+import AdminNotifications from "./pages/adminnotifications";
 
 export default function App() {
   return (
@@ -68,6 +69,7 @@ export default function App() {
            <Route path="serviceestimation" element={<ServiceEstimation />} />
            <Route path="call-report" element={<CallReport />} />
            <Route path="reports" element={<Reports />} />
+           <Route path="notifications" element={<AdminNotifications />} />
            
           </Route>
         </Routes>

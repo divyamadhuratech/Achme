@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Plus, Search, Download, X, Edit2, MinusCircle, PlusCircle, Trash2, Mail, MapPin, ChevronDown } from "lucide-react";
+import { Plus, Search, Download, X, Edit2, MinusCircle, PlusCircle, Trash2, Mail, MapPin, ChevronDown, History } from "lucide-react";
 import Invoice from "../components/invoicetemplate";
 import { calculateItemTotal, calculateTotals } from "../utils/invoicecal";
 import axios from "axios";
@@ -83,19 +83,30 @@ const PerformaInvoice = () => {
 
   const invoiceRef = useRef(null);
 
+  // ── Version History ──────────────────────────────────────────────────────
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyList, setHistoryList] = useState([]);
+  const [historyCustomerName, setHistoryCustomerName] = useState("");
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyRootId, setHistoryRootId] = useState(null);
+  const [historySelectedId, setHistorySelectedId] = useState(null);
+
   const formatPINumber = (id, dateStr) => {
     const year = dateStr ? new Date(dateStr).getFullYear() : new Date().getFullYear();
     return `PI-${year}-${String(id).padStart(3, "0")}`;
   };
 
-  const downloadPDF = () => {
-    if (!invoiceRef.current) return;
-    html2pdf().from(invoiceRef.current).set({
-      margin: 10, filename: `Performa_Invoice_${viewId}.pdf`,
-      image: { type: "jpeg", quality: 0.98 },
-      html2canvas: { scale: 2 },
-      jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-    }).save();
+  const downloadPDF = async () => {
+    const id = viewId || selectedId;
+    if (!id) return;
+    try {
+      const res = await fetch(`http://localhost:3000/api/performainvoice/download-pdf/${id}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href = url;
+      a.download = `ProformaInvoice_${formatPINumber(id, performaInvoices.find(p=>p.id===id)?.invoice_date)}.pdf`;
+      a.click(); URL.revokeObjectURL(url);
+    } catch(e) { alert("Download failed"); }
   };
 
   useEffect(() => {
@@ -115,6 +126,33 @@ const PerformaInvoice = () => {
   const fetchFromAddresses = async () => {
     try { const res = await axios.get("http://localhost:3000/api/performainvoice/from-addresses"); setFromAddresses(res.data); }
     catch (err) { console.error(err); }
+  };
+
+  const openHistory = async (e, invoiceId, customerName, parentId) => {
+    e.stopPropagation();
+    try {
+      const res = await axios.get(`http://localhost:3000/api/performainvoice/version-history/${invoiceId}`);
+      setHistoryList(res.data);
+      setHistoryCustomerName(customerName);
+      setHistorySearch("");
+      setHistorySelectedId(null);
+      setHistoryRootId(parentId || invoiceId);
+      setHistoryOpen(true);
+    } catch (err) { console.error(err); alert("Failed to load history"); }
+  };
+
+  const deleteHistoryVersion = async (e, id) => {
+    e.stopPropagation();
+    if (!window.confirm("Delete this version?")) return;
+    try {
+      await axios.delete(`http://localhost:3000/api/performainvoice/${id}`);
+      setHistoryList(prev => prev.filter(q => q.id !== id));
+    } catch (err) { alert("Failed to delete version"); }
+  };
+
+  const formatSubPINumber = (rootId, version, dateStr) => {
+    const year = dateStr ? new Date(dateStr).getFullYear() : new Date().getFullYear();
+    return `PI-${year}-${String(rootId).padStart(3, "0")}-${version}`;
   };
 
   const handleAddAddress = async () => {
@@ -380,6 +418,7 @@ const PerformaInvoice = () => {
                 <th className="px-4 py-4 border-r">Date</th>
                 <th className="px-4 py-4 border-r">Total</th>
                 <th className="px-4 py-4 border-r">City</th>
+                <th className="px-4 py-4">History</th>
               </tr>
             </thead>
             <tbody>
@@ -393,9 +432,15 @@ const PerformaInvoice = () => {
                   <td className="px-4 py-4 border-r">{formatDate(p.invoice_date)}</td>
                   <td className="px-4 py-4 border-r font-bold text-gray-900">&#8377;{p.grand_total?.toLocaleString()}</td>
                   <td className="px-4 py-4 border-r">{p.location_city}</td>
+                  <td className="px-4 py-4 text-center">
+                    <button onClick={e => openHistory(e, p.id, p.customer_name, p.parent_id)}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 text-xs font-bold transition">
+                      <History size={13} /> History
+                    </button>
+                  </td>
                 </tr>
               ))}
-              {filteredInvoices.length === 0 && (<tr><td colSpan="7" className="py-10 text-gray-400 italic">No invoices found</td></tr>)}
+              {filteredInvoices.length === 0 && (<tr><td colSpan="8" className="py-10 text-gray-400 italic">No invoices found</td></tr>)}
             </tbody>
           </table>
           <p className="p-3 text-xs text-gray-400 italic text-left">Double-click a row to preview invoice</p>
@@ -827,6 +872,71 @@ const PerformaInvoice = () => {
           </form>
         </div>
       </div>
+
+      {/* ── Version History Modal ── */}
+      {historyOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex justify-center items-start overflow-y-auto pt-10 pb-10">
+          <div className="bg-white rounded-xl shadow-2xl w-[95%] max-w-3xl p-6">
+            <div className="flex justify-between items-center mb-4 border-b pb-4">
+              <div>
+                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><History size={20} className="text-indigo-500" /> Previous Versions</h2>
+                <p className="text-sm text-indigo-600 font-semibold">{historyCustomerName}</p>
+              </div>
+              <X className="cursor-pointer text-gray-400 hover:text-red-500" onClick={() => setHistoryOpen(false)} />
+            </div>
+            <div className="flex items-center gap-2 bg-gray-50 border rounded-lg px-3 py-2 mb-4">
+              <Search size={15} className="text-gray-400" />
+              <input type="text" placeholder="Search by sub-invoice number..." value={historySearch} onChange={e => setHistorySearch(e.target.value)} className="outline-none text-sm bg-transparent flex-1" />
+              {historySearch && <X size={14} className="text-gray-400 cursor-pointer hover:text-red-500" onClick={() => setHistorySearch("")} />}
+            </div>
+            {(() => {
+              const filtered = historyList.filter(q => {
+                const subNum = formatSubPINumber(q.parent_id || historyRootId, q.version, q.invoice_date).toLowerCase();
+                return !historySearch || subNum.includes(historySearch.toLowerCase());
+              });
+              return filtered.length === 0 ? (
+                <p className="text-center text-gray-400 py-10 italic">{historyList.length === 0 ? "No previous versions. This is the original." : "No results match your search."}</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border-collapse">
+                    <thead className="bg-gray-50">
+                      <tr className="text-gray-600 font-bold uppercase text-xs border-b">
+                        <th className="px-4 py-3 text-left">Sub-PI Number</th>
+                        <th className="px-4 py-3">Date</th>
+                        <th className="px-4 py-3 text-right">Total</th>
+                        <th className="px-4 py-3 text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.map(q => (
+                        <tr key={q.id} onClick={() => setHistorySelectedId(q.id)}
+                          onDoubleClick={() => { setViewId(q.id); setTimeout(() => setShowInvoice(true), 50); setHistoryOpen(false); }}
+                          className={`border-b cursor-pointer hover:bg-indigo-50/40 transition ${historySelectedId === q.id ? "bg-indigo-50" : ""}`}>
+                          <td className="px-4 py-3 font-semibold text-blue-600">
+                            {formatSubPINumber(q.parent_id || historyRootId, q.version, q.invoice_date)}
+                            <span className="ml-2 text-[10px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded font-bold">v{q.version || 1}</span>
+                          </td>
+                          <td className="px-4 py-3 text-center text-gray-600">{formatDate(q.invoice_date)}</td>
+                          <td className="px-4 py-3 text-right font-bold text-gray-800">₹{q.grand_total?.toLocaleString()}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-center gap-2">
+                              <button onClick={e => { e.stopPropagation(); setViewId(q.id); setTimeout(() => setShowInvoice(true), 50); setHistoryOpen(false); }} title="View" className="w-8 h-8 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center hover:bg-blue-100"><Download size={14} /></button>
+                              <button onClick={e => { e.stopPropagation(); handleEdit(q.id); setHistoryOpen(false); }} title="Edit" className="w-8 h-8 bg-green-50 text-green-600 rounded-lg flex items-center justify-center hover:bg-green-100"><Edit2 size={14} /></button>
+                              <button onClick={e => { e.stopPropagation(); openMailModal(); setSelectedId(q.id); setHistoryOpen(false); }} title="Email" className="w-8 h-8 bg-orange-50 text-orange-500 rounded-lg flex items-center justify-center hover:bg-orange-100"><Mail size={14} /></button>
+                              <button onClick={e => deleteHistoryVersion(e, q.id)} title="Delete" className="w-8 h-8 bg-red-50 text-red-500 rounded-lg flex items-center justify-center hover:bg-red-100"><Trash2 size={14} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <p className="text-xs text-gray-400 italic mt-3 text-center">Double-click any row to open that invoice</p>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
 
       {/* Mail Modal */}
       <div className={`overlay ${mailOpen ? "show" : ""} flex justify-center items-center`}>

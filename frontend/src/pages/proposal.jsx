@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Plus, Search, Download, X, Edit2, MinusCircle, PlusCircle, Trash2, Mail, MapPin, ChevronDown } from "lucide-react";
+import { Plus, Search, Download, X, Edit2, MinusCircle, PlusCircle, Trash2, Mail, MapPin, ChevronDown, History } from "lucide-react";
 import { calculateItemTotal, calculateTotals } from "../utils/invoicecal";
 import axios from "axios";
 import html2pdf from "html2pdf.js";
@@ -76,6 +76,14 @@ const Proposal = () => {
   const [newAddrText, setNewAddrText] = useState("");
   const [clientSearchResults, setClientSearchResults] = useState([]);
 
+  // ── History modal state ──────────────────────────────────────────────────
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyList, setHistoryList] = useState([]);
+  const [historyCustomerName, setHistoryCustomerName] = useState("");
+  const [historySelectedId, setHistorySelectedId] = useState(null);
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyRootId, setHistoryRootId] = useState(null);
+
   const [items, setItems] = useState([{ name: "", brand_model: "", hsn_sac: "", uom: "Nos", price: 0, qty: 1, tax: 18, discount: 0 }]);
   const [customer, setCustomer] = useState({ customer_name: "", mobile_number: "", email: "", gst_number: "", location_city: "" });
   const [quotationData, setQuotationData] = useState({ quotation_date: (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })() });
@@ -89,9 +97,31 @@ const Proposal = () => {
     return `QT-${year}-${String(id).padStart(3, "0")}`;
   };
 
+  const formatSubQTNumber = (rootId, version, dateStr) => {
+    const year = dateStr ? new Date(dateStr).getFullYear() : new Date().getFullYear();
+    return `QT-${year}-${String(rootId).padStart(3, "0")}-${version}`;
+  };
+
   useEffect(() => {
     fetchQuotationDataList();
     fetchFromAddresses();
+    // Pick up lead prefill from telecalling/walkin/field pages
+    const prefill = sessionStorage.getItem("qt_prefill");
+    if (prefill) {
+      try {
+        const p = JSON.parse(prefill);
+        setCustomer(c => ({
+          ...c,
+          customer_name: p.customer_name || "",
+          mobile_number: p.mobile_number || "",
+          email: p.email || "",
+          location_city: p.location_city || "",
+        }));
+        setExtra(ex => ({ ...ex, client_city: p.location_city || "" }));
+        setOpen(true);
+        sessionStorage.removeItem("qt_prefill");
+      } catch (_) {}
+    }
   }, []);
 
   const fetchQuotationDataList = async () => {
@@ -210,8 +240,9 @@ const Proposal = () => {
         extra,
       };
       if (editId) {
-        await axios.put(`http://localhost:3000/api/quotations/${editId}`, payload);
-        alert("Updated successfully");
+        const res = await axios.put(`http://localhost:3000/api/quotations/${editId}`, payload);
+        // Backend creates a new version — refresh list and close
+        alert(`Version ${res.data.version || ""} saved successfully`);
       } else {
         await axios.post("http://localhost:3000/api/quotations/create", payload);
         alert("Created successfully");
@@ -279,6 +310,56 @@ const Proposal = () => {
     setDescInput(value);
   };
 
+  // ── Open history modal for a quotation's customer ────────────────────────
+  const openHistory = async (e, quotationId, customerName) => {
+    e.stopPropagation();
+    try {
+      const res = await axios.get(`http://localhost:3000/api/quotations/customer-history/${quotationId}`);
+      setHistoryList(res.data);
+      setHistoryCustomerName(customerName);
+      setHistorySelectedId(null);
+      setHistorySearch("");
+      // Root id: if current row has parent_id use that, else use quotationId itself
+      const currentRow = quotationDataList.find(p => p.id === quotationId);
+      setHistoryRootId(currentRow?.parent_id || quotationId);
+      setHistoryOpen(true);
+    } catch (err) { console.error(err); alert("Failed to load history"); }
+  };
+
+  const openHistoryMail = (id, customerName) => {
+    const inv = historyList.find(p => p.id === id);
+    setMailTo(inv?.email || "");
+    setMailSubject(`Proposal ${formatQTNumber(id, inv?.invoice_date)}`);
+    setSelectedId(id);
+    setHistoryOpen(false);
+    setMailOpen(true);
+  };
+
+  const deleteHistoryVersion = async (e, id) => {
+    e.stopPropagation();
+    if (!window.confirm("Delete this version? This cannot be undone.")) return;
+    try {
+      await axios.delete(`http://localhost:3000/api/quotations/${id}`);
+      setHistoryList(prev => prev.filter(q => q.id !== id));
+    } catch (err) { alert("Failed to delete version"); }
+  };
+
+  const downloadHistoryPdf = (id, dateStr) => {
+    // Set selectedId so the invoice preview renders, then trigger download
+    setViewId(id);
+    setTimeout(() => {
+      if (invoiceRef.current) {
+        html2pdf().from(invoiceRef.current).set({
+          margin: 10, filename: `Quotation_${formatQTNumber(id, dateStr)}.pdf`,
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: { scale: 2 },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
+        }).save();
+      }
+    }, 800);
+    setHistoryOpen(false);
+  };
+
   const updateItem = (i, field, value) => { const copy = [...items]; copy[i][field] = value; setItems(copy); };
   const addItem = () => { setItems(p => [...p, { name: "", brand_model: "", hsn_sac: "", uom: "Nos", price: 0, qty: 1, tax: 18, discount: 0 }]); setDescInput(prev => prev ? prev + ", " : ""); };
   const removeItem = () => { if (items.length <= 1) return; const n = items.slice(0, -1); setItems(n); setDescInput(n.map(i => i.name).join(", ")); };
@@ -313,7 +394,18 @@ const Proposal = () => {
             <input type="text" placeholder="Search by customer..." className="outline-none text-sm w-40 bg-transparent" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           </div>
           <div className="flex items-center gap-2 mt-2">
-            <button onClick={() => { if (invoiceRef.current) { html2pdf().from(invoiceRef.current).set({ margin: 10, filename: `Quotation_${viewId}.pdf`, image: { type: "jpeg", quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: "mm", format: "a4", orientation: "portrait" } }).save(); } }} title="Download PDF" className="w-10 h-10 bg-white border rounded-lg shadow-sm flex justify-center items-center hover:bg-gray-50 transition"><Download size={20} /></button>
+            <button onClick={async () => {
+              if (!selectedId && !viewId) return alert("Select an invoice first");
+              const id = viewId || selectedId;
+              try {
+                const res = await fetch(`http://localhost:3000/api/quotations/download-pdf/${id}`);
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a"); a.href = url;
+                a.download = `Quotation_${formatQTNumber(id, quotationDataList.find(p=>p.id===id)?.invoice_date)}.pdf`;
+                a.click(); URL.revokeObjectURL(url);
+              } catch(e) { alert("Download failed"); }
+            }} title="Download PDF" className="w-10 h-10 bg-white border rounded-lg shadow-sm flex justify-center items-center hover:bg-gray-50 transition"><Download size={20} /></button>
             <button onClick={openMailModal} title="Send Email" className="w-10 h-10 bg-white border rounded-lg shadow-sm flex justify-center items-center hover:bg-gray-50 transition"><Mail size={18} /></button>
             <button onClick={() => { if (!selectedId) return alert("Select an item"); handleEdit(selectedId); }} title="Edit" className="w-10 h-10 bg-white border rounded-lg shadow-sm flex justify-center items-center hover:bg-gray-50 transition"><Edit2 size={18} /></button>
             <button onClick={handleDelete} title="Delete" className="w-10 h-10 bg-white border rounded-lg shadow-sm flex justify-center items-center hover:bg-gray-50 transition"><Trash2 size={18} className="text-red-500" /></button>
@@ -337,6 +429,7 @@ const Proposal = () => {
               <th className="px-4 py-4 border-r">Date</th>
               <th className="px-4 py-4 border-r">Total</th>
               <th className="px-4 py-4 border-r">City</th>
+              <th className="px-4 py-4">History</th>
             </tr>
           </thead>
           <tbody>
@@ -350,9 +443,18 @@ const Proposal = () => {
                 <td className="px-4 py-4 border-r">{formatDate(p.quotation_date || p.invoice_date)}</td>
                 <td className="px-4 py-4 border-r font-bold text-gray-900">&#8377;{p.grand_total?.toLocaleString()}</td>
                 <td className="px-4 py-4 border-r">{p.location_city}</td>
+                <td className="px-4 py-4 text-center">
+                  <button
+                    onClick={e => openHistory(e, p.id, p.customer_name)}
+                    title="View customer history"
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 text-xs font-bold transition"
+                  >
+                    <History size={13} /> History
+                  </button>
+                </td>
               </tr>
             ))}
-            {filteredInvoices.length === 0 && (<tr><td colSpan="7" className="py-10 text-gray-400 italic">No invoices found</td></tr>)}
+            {filteredInvoices.length === 0 && (<tr><td colSpan="8" className="py-10 text-gray-400 italic">No invoices found</td></tr>)}
           </tbody>
         </table>
       </div>
@@ -814,6 +916,105 @@ const Proposal = () => {
           </form>
         </div>
       </div>
+
+      {/* ── History Modal ─────────────────────────────────────────────── */}
+      {historyOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex justify-center items-start overflow-y-auto pt-10 pb-10">
+          <div className="bg-white rounded-xl shadow-2xl w-[95%] max-w-3xl p-6 relative">
+            <div className="flex justify-between items-center mb-4 border-b pb-4">
+              <div>
+                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                  <History size={20} className="text-indigo-500" /> Previous Versions
+                </h2>
+                <p className="text-sm text-indigo-600 font-semibold mt-0.5">{historyCustomerName}</p>
+              </div>
+              <X className="cursor-pointer text-gray-400 hover:text-red-500" onClick={() => setHistoryOpen(false)} />
+            </div>
+
+            {/* Search bar */}
+            <div className="flex items-center gap-2 bg-gray-50 border rounded-lg px-3 py-2 mb-4">
+              <Search size={15} className="text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by sub-quotation number..."
+                value={historySearch}
+                onChange={e => setHistorySearch(e.target.value)}
+                className="outline-none text-sm bg-transparent flex-1"
+              />
+              {historySearch && <X size={14} className="text-gray-400 cursor-pointer hover:text-red-500" onClick={() => setHistorySearch("")} />}
+            </div>
+
+            {(() => {
+              const filtered = historyList.filter(q => {
+                const subNum = formatSubQTNumber(q.parent_id || historyRootId, q.version, q.invoice_date).toLowerCase();
+                return !historySearch || subNum.includes(historySearch.toLowerCase());
+              });
+              return filtered.length === 0 ? (
+                <p className="text-center text-gray-400 py-10 italic">
+                  {historyList.length === 0
+                    ? "No previous versions found. This is the original quotation."
+                    : "No results match your search."}
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border-collapse">
+                    <thead className="bg-gray-50">
+                      <tr className="text-gray-600 font-bold uppercase text-xs border-b">
+                        <th className="px-4 py-3 text-left">Sub-QT Number</th>
+                        <th className="px-4 py-3">Date</th>
+                        <th className="px-4 py-3 text-right">Total</th>
+                        <th className="px-4 py-3 text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.map((q) => (
+                        <tr
+                          key={q.id}
+                          onClick={() => setHistorySelectedId(q.id)}
+                          onDoubleClick={() => {
+                            setViewId(q.id);
+                            setTimeout(() => setShowInvoice(true), 50);
+                            setHistoryOpen(false);
+                          }}
+                          className={`border-b cursor-pointer hover:bg-indigo-50/40 transition ${historySelectedId === q.id ? "bg-indigo-50" : ""}`}
+                        >
+                          <td className="px-4 py-3 font-semibold text-blue-600">
+                            {formatSubQTNumber(q.parent_id || historyRootId, q.version, q.invoice_date)}
+                            <span className="ml-2 text-[10px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded font-bold">v{q.version || 1}</span>
+                          </td>
+                          <td className="px-4 py-3 text-center text-gray-600">{formatDate(q.invoice_date)}</td>
+                          <td className="px-4 py-3 text-right font-bold text-gray-800">₹{q.grand_total?.toLocaleString()}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                onClick={e => { e.stopPropagation(); setViewId(q.id); setTimeout(() => setShowInvoice(true), 50); setHistoryOpen(false); }}
+                                title="View" className="w-8 h-8 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center hover:bg-blue-100 transition"
+                              ><Download size={14} /></button>
+                              <button
+                                onClick={e => { e.stopPropagation(); handleEdit(q.id); setHistoryOpen(false); }}
+                                title="Edit" className="w-8 h-8 bg-green-50 text-green-600 rounded-lg flex items-center justify-center hover:bg-green-100 transition"
+                              ><Edit2 size={14} /></button>
+                              <button
+                                onClick={e => { e.stopPropagation(); openHistoryMail(q.id, historyCustomerName); }}
+                                title="Send Email" className="w-8 h-8 bg-orange-50 text-orange-500 rounded-lg flex items-center justify-center hover:bg-orange-100 transition"
+                              ><Mail size={14} /></button>
+                              <button
+                                onClick={e => deleteHistoryVersion(e, q.id)}
+                                title="Delete version" className="w-8 h-8 bg-red-50 text-red-500 rounded-lg flex items-center justify-center hover:bg-red-100 transition"
+                              ><Trash2 size={14} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <p className="text-xs text-gray-400 italic mt-3 text-center">Double-click any row to open that quotation</p>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
 
       {/* Mail Modal */}
       <div className={`overlay ${mailOpen ? "show" : ""} flex justify-center items-center`}>

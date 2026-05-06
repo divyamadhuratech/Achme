@@ -45,6 +45,10 @@ app.use("/api/estimate-invoice", require("./routes/estimateInvoiceRoutes"));
 app.use("/api/service-estimation", require("./routes/serviceEstimationRoutes"));
 app.use("/api/call-reports", require("./routes/callReportRoutes"));
 app.use("/api/services", require("./routes/serviceRoutes"));
+app.use("/api/leads", require("./routes/leadManagementRoutes"));
+
+// Start reminder escalation scheduler
+require("./backendutil/reminderScheduler");
 app.use("/uploads", express.static("uploads"));
 
 // ── Start ─────────────────────────────────────────────────────────────────────

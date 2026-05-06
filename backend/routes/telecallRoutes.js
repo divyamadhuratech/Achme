@@ -8,7 +8,16 @@ const toDateOnly = (val) => {
   return val.toString().slice(0, 10);
 };
 router.get("/", (req, res) => {
-  db.query("SELECT * FROM Telecalls ORDER BY id DESC", (err, results) => {
+  // Admin sees all. User sees only leads where staff_name matches their name
+  const { user_id, role, user_name } = req.query;
+  let sql = "SELECT * FROM Telecalls";
+  const params = [];
+  if (role === "user" && user_name) {
+    sql += " WHERE staff_name = ? OR assigned_to = ?";
+    params.push(user_name, user_id || 0);
+  }
+  sql += " ORDER BY id DESC";
+  db.query(sql, params, (err, results) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(results);
   });
@@ -18,26 +27,21 @@ const syncClient = (data) => {
   const { customer_name, mobile_number, location_city, service_name, email, call_outcome } = data;
 
   if (call_outcome === "Converted") {
-    db.query(
-      "SELECT * FROM clients WHERE phone = ?",
-      [mobile_number],
-      (err, result) => {
-        if (err) return;
-        if (result.length === 0) {
-          db.query(
-            "INSERT INTO clients (name, phone, address, service, email) VALUES (?, ?, ?, ?, ?)",
-            [customer_name, mobile_number, location_city, service_name, email]
-          );
-        } else {
-          db.query(
-            "UPDATE clients SET name=?, address=?, service=?, email=? WHERE phone=?",
-            [customer_name, location_city, service_name, email, mobile_number]
-          );
-        }
+    db.query("SELECT id FROM clients WHERE phone = ?", [mobile_number], (err, result) => {
+      if (err) return;
+      if (result.length === 0) {
+        db.query(
+          "INSERT INTO clients (name, phone, address, service, email) VALUES (?, ?, ?, ?, ?)",
+          [customer_name, mobile_number, location_city, service_name, email]
+        );
+      } else {
+        db.query(
+          "UPDATE clients SET name=?, address=?, service=?, email=? WHERE phone=?",
+          [customer_name, location_city, service_name, email, mobile_number]
+        );
       }
-    );
+    });
   } else {
-    // If not converted, ensure it's removed from clients if it exists
     db.query("DELETE FROM clients WHERE phone = ?", [mobile_number]);
   }
 };
@@ -123,7 +127,20 @@ router.post("/", (req, res) => {
     (err, result) => {
       if (err) return res.status(500).json({ error: err.message });
       syncClient(req.body);
-      res.json({ message: "Telecall added", id: result.insertId });
+      const newId = result.insertId;
+      // Log activity
+      db.query(
+        "INSERT INTO lead_activity (lead_id, lead_type, action, details) VALUES (?,?,?,?)",
+        [newId, "telecall", "Lead Created", `Status: ${call_outcome || "New"}`]
+      );
+      // If reminder set, add to lead_reminders
+      if (reminder_required === "Yes" && reminder_date) {
+        db.query(
+          "INSERT INTO lead_reminders (lead_id, lead_type, reminder_date, reminder_notes, status) VALUES (?,?,?,?,'Pending')",
+          [newId, "telecall", toDateOnly(reminder_date), reminder_notes || ""]
+        );
+      }
+      res.json({ message: "Telecall added", id: newId });
     }
   );
 });
@@ -191,12 +208,43 @@ router.put("/:id", (req, res) => {
         console.error("Update error:", err);
         return res.status(500).json({ error: err.message });
       }
-
       if (result.affectedRows === 0) {
         return res.status(404).json({ message: "Telecall not found" });
       }
-
       syncClient(req.body);
+
+      const id = req.params.id;
+
+      // Log status change activity
+      db.query(
+        "INSERT INTO lead_activity (lead_id, lead_type, action, details) VALUES (?,?,?,?)",
+        [id, "telecall", "Status Updated", `Outcome: ${call_outcome || "New"}`]
+      );
+
+      // If follow-up set, log it as activity
+      if (followup_required === "Yes" && followup_date) {
+        db.query(
+          "INSERT INTO lead_activity (lead_id, lead_type, action, details) VALUES (?,?,?,?)",
+          [id, "telecall", "Follow-up Scheduled", `Date: ${toDateOnly(followup_date)}${followup_notes ? " | Notes: " + followup_notes : ""}`]
+        );
+      }
+
+      // If reminder set, add to lead_reminders table (history) AND log activity
+      if (reminder_required === "Yes" && reminder_date) {
+        db.query(
+          "INSERT INTO lead_reminders (lead_id, lead_type, reminder_date, reminder_notes, status) VALUES (?,?,?,?,'Pending')",
+          [id, "telecall", toDateOnly(reminder_date), reminder_notes || ""],
+          (e, r) => {
+            if (!e) {
+              db.query(
+                "INSERT INTO lead_activity (lead_id, lead_type, action, details) VALUES (?,?,?,?)",
+                [id, "telecall", "Reminder Added", `Date: ${toDateOnly(reminder_date)}${reminder_notes ? " | " + reminder_notes : ""}`]
+              );
+            }
+          }
+        );
+      }
+
       res.json({ message: "Telecall updated successfully" });
     }
   );

@@ -40,16 +40,15 @@ router.get("/", (req, res) => {
 
 /* UPDATE CLIENT */
 router.put("/:id", (req, res) => {
-  const { name, company_name, email, phone, address, state, pincode, gst_number } = req.body;
-  const sql = `
-    UPDATE clients 
-    SET name=?, company_name=?, email=?, phone=?, address=?, state=?, pincode=?, gst_number=? 
-    WHERE id=?
-  `;
-  db.query(sql, [name, company_name, email, phone, address, state, pincode, gst_number, req.params.id], (err) => {
-    if (err) return res.status(500).json(err);
-    res.json({ message: "Client updated successfully" });
-  });
+  const { name, email, phone, address, service } = req.body;
+  db.query(
+    "UPDATE clients SET name=?, email=?, phone=?, address=?, service=? WHERE id=?",
+    [name, email, phone, address, service, req.params.id],
+    (err) => {
+      if (err) return res.status(500).json(err);
+      res.json({ message: "Client updated successfully" });
+    }
+  );
 });
 
 /* DELETE CLIENT */

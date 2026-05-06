@@ -35,11 +35,18 @@
           email: email.trim().toLowerCase(),
           otp,
         });
-
         login(res.data.user);
         navigate("/dashboard");
       } catch (err) {
-        alert(err.response?.data?.message || "Login failed");
+        const msg = err.response?.data?.message || "Login failed";
+        const status = err.response?.status;
+        if (status === 404) {
+          alert("⚠️ " + msg + "\n\nClick 'Register' below to create an account.");
+        } else if (status === 403) {
+          alert("🔒 " + msg);
+        } else {
+          alert(msg);
+        }
       }
     };
 

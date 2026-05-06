@@ -85,6 +85,12 @@ router.post("/", (req, res) => {
 
       const newSessionId = sessionId.startsWith("NOSESS-") ? `SES-${Date.now()}` : sessionId;
 
+      // Helper: combine date + HH:MM time into MySQL datetime
+      const toDatetime = (dateStr, timeStr) => {
+        if (!dateStr || !timeStr) return null;
+        return `${dateStr} ${timeStr}:00`;
+      };
+
       const values = calls.map(c => [
         newSessionId,
         c.client_name,
@@ -93,8 +99,8 @@ router.post("/", (req, res) => {
         c.phone || "",
         c.location || "",
         c.call_sequence || 1,
-        c.start_time || null,
-        c.end_time || null,
+        toDatetime(c.report_date, c.start_time),
+        toDatetime(c.report_date, c.end_time),
         c.assigned_time || 30,
         c.actual_duration || 0,
         c.is_exceeded ? 1 : 0,

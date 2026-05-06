@@ -21,6 +21,34 @@ const Clients = () => {
     }
   };
 
+  const downloadExcel = () => {
+    const data = filteredClients.length > 0 ? filteredClients : clients;
+    if (!data.length) return alert("No client data to export");
+
+    // Match exactly the table columns shown: ID, Name, Email, Phone, City, Service
+    const headers = ["ID", "Name", "Email", "Phone", "City", "Service"];
+    const rows = data.map(c => [
+      c.id,
+      c.name || "",
+      c.email || "",
+      c.phone || "",
+      c.address || "",
+      c.service || ""
+    ]);
+
+    const csvContent = [headers, ...rows]
+      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Clients_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   useEffect(() => {
     fetchClients();
   }, []);
@@ -39,13 +67,10 @@ const Clients = () => {
   // form State
   const [form, setForm] = useState({
     name: "",
-    company_name: "",
     email: "",
     phone: "",
     address: "",
-    state: "",
-    pincode: "",
-    gst_number: "",
+    service: "",
   });
 
   const handleChange = (e) =>
@@ -54,7 +79,6 @@ const Clients = () => {
   // Save
   const saveClient = async (e) => {
     e.preventDefault();
-
     try {
       if (isEdit) {
         await axios.put(`http://localhost:3000/api/client/${selectedClientId}`, form);
@@ -63,7 +87,6 @@ const Clients = () => {
         await axios.post("http://localhost:3000/api/client", form);
         alert("Client added successfully");
       }
-
       resetForm();
       setOpen(false);
       fetchClients();
@@ -73,16 +96,7 @@ const Clients = () => {
   };
 
   const resetForm = () => {
-    setForm({
-      name: "",
-      company_name: "",
-      email: "",
-      phone: "",
-      address: "",
-      state: "",
-      pincode: "",
-      gst_number: "",
-    });
+    setForm({ name: "", email: "", phone: "", address: "", service: "" });
     setIsEdit(false);
     setSelectedClientId(null);
   };
@@ -90,15 +104,11 @@ const Clients = () => {
   const openEditModal = (selectedClient) => {
     setForm({
       name: selectedClient.name || "",
-      company_name: selectedClient.company_name || "",
       email: selectedClient.email || "",
       phone: selectedClient.phone || "",
       address: selectedClient.address || "",
-      state: selectedClient.state || "",
-      pincode: selectedClient.pincode || "",
-      gst_number: selectedClient.gst_number || "",
+      service: selectedClient.service || "",
     });
-
     setSelectedClientId(selectedClient.id);
     setIsEdit(true);
     setOpen(true);
@@ -116,9 +126,10 @@ const Clients = () => {
   }, [open]);
 
   // Filter clients by name
-  const filteredClients = clients.filter(c => 
+  const filteredClients = clients.filter(c =>
     c.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.company_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    c.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    c.phone?.includes(searchTerm)
   );
 
   return (
@@ -144,7 +155,13 @@ const Clients = () => {
           />
         </div>
 
-       
+        {/* Download XL */}
+        <button
+          onClick={downloadExcel}
+          className="flex items-center gap-2 bg-green-700 text-white px-5 py-2 rounded-lg text-sm font-bold hover:bg-green-800 transition shadow"
+        >
+          ⬇ Download XL
+        </button>
       </div>
 
       {/* Table */}

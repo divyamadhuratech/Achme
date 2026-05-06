@@ -1,21 +1,28 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
 
 const AuthContext = createContext(undefined);
 
 export function AuthProvider({ children }) {
+  // Use sessionStorage — isolated per browser tab, so logging out in one tab
+  // does NOT affect other tabs (admin vs user testing simultaneously)
   const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem("user");
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = sessionStorage.getItem("user");
+      return saved ? JSON.parse(saved) : null;
+    } catch (_) { return null; }
   });
 
   const login = (userData) => {
     setUser(userData);
-    localStorage.setItem("user", JSON.stringify(userData));
+    sessionStorage.setItem("user", JSON.stringify(userData));
+    // Also store token if present
+    if (userData.token) sessionStorage.setItem("token", userData.token);
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem("user");
+    sessionStorage.removeItem("user");
+    sessionStorage.removeItem("token");
   };
 
   return (

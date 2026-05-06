@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import "../Styles/tailwind.css";
-import { Search, Plus, X, Trash2, Edit, PlusCircle, History, Printer, User, Clock, MapPin, Calendar, AlertCircle } from "lucide-react";
+import { Search, Plus, X, Trash2, Edit, PlusCircle, History, User, Clock, MapPin, Calendar, AlertCircle } from "lucide-react";
 import axios from "axios";
 
 const CallReport = () => {
@@ -84,9 +84,9 @@ const CallReport = () => {
 
   const [executiveName, setExecutiveName] = useState("");
   const [staffName, setStaffName] = useState("");
-  const [reportDate, setReportDate] = useState(localToday());
   const [calls, setCalls] = useState([{
     id: Date.now(), client_name: "", location: "", phone: "",
+    call_date: localToday(),
     start_time: "", end_time: "", assigned_time: 30,
     actual_duration: 0, is_exceeded: false, service_details: "", remarks: "", km: "",
   }]);
@@ -94,6 +94,7 @@ const CallReport = () => {
   const addCallRow = () => {
     setCalls([...calls, {
       id: Date.now(), client_name: "", location: "", phone: "",
+      call_date: localToday(),
       start_time: "", end_time: "", assigned_time: 30,
       actual_duration: 0, is_exceeded: false, service_details: "", remarks: "", km: "",
     }]);
@@ -112,9 +113,12 @@ const CallReport = () => {
           const end = field === "end_time" ? value : c.end_time;
           const assigned = field === "assigned_time" ? Number(value) : c.assigned_time;
           if (start && end) {
-            const s = new Date(start);
-            const e = new Date(end);
-            const diffMins = Math.floor((e - s) / 60000);
+            // Parse HH:MM time strings
+            const [sh, sm] = start.split(":").map(Number);
+            const [eh, em] = end.split(":").map(Number);
+            const startMins = sh * 60 + sm;
+            const endMins = eh * 60 + em;
+            const diffMins = endMins - startMins;
             if (!isNaN(diffMins)) {
               updated.actual_duration = diffMins > 0 ? diffMins : 0;
               updated.is_exceeded = updated.actual_duration > assigned;
@@ -137,7 +141,7 @@ const CallReport = () => {
         ...c,
         staff_name: staffName,
         executive_name: executiveName,
-        report_date: reportDate,
+        report_date: c.call_date,
         call_sequence: idx + 1,
         complaint: c.service_details,
         km: c.km || null,
@@ -153,8 +157,7 @@ const CallReport = () => {
   const resetForm = () => {
     setExecutiveName("");
     setStaffName("");
-    setReportDate(localToday());
-    setCalls([{ id: Date.now(), client_name: "", location: "", phone: "", start_time: "", end_time: "", assigned_time: 30, actual_duration: 0, is_exceeded: false, service_details: "", remarks: "", km: "" }]);
+    setCalls([{ id: Date.now(), client_name: "", location: "", phone: "", call_date: localToday(), start_time: "", end_time: "", assigned_time: 30, actual_duration: 0, is_exceeded: false, service_details: "", remarks: "", km: "" }]);
     setIsEdit(false); setEditSessionId(null);
   };
 
@@ -166,14 +169,14 @@ const CallReport = () => {
       if (sessionCalls && sessionCalls.length > 0) {
         setStaffName(session.staff_name);
         setExecutiveName(sessionCalls[0].executive_name || "");
-        setReportDate(session.report_date?.split("T")[0] || localToday());
         setCalls(sessionCalls.map(c => ({
           id: c.id,
           client_name: c.client_name,
           location: c.location || "",
           phone: c.phone || "",
-          start_time: c.start_time ? new Date(c.start_time).toISOString().slice(0, 16) : "",
-          end_time: c.end_time ? new Date(c.end_time).toISOString().slice(0, 16) : "",
+          call_date: c.report_date ? c.report_date.split("T")[0] : localToday(),
+          start_time: c.start_time ? new Date(c.start_time).toTimeString().slice(0, 5) : "",
+          end_time: c.end_time ? new Date(c.end_time).toTimeString().slice(0, 5) : "",
           assigned_time: c.assigned_time || 30,
           actual_duration: c.actual_duration || 0,
           is_exceeded: !!c.is_exceeded,
@@ -225,45 +228,41 @@ const CallReport = () => {
     } catch (err) { console.error(err); }
   };
 
-  const printReport = () => {
-    const win = window.open("", "_blank");
-    win.document.write(`
-      <html>
-        <head>
-          <title>Service Report - ${historyStaff}</title>
-          <style>
-            body { font-family: sans-serif; padding: 40px; color: #333; }
-            h1 { color: #1e40af; border-bottom: 2px solid #1e40af; padding-bottom: 10px; }
-            .meta { margin-bottom: 30px; font-weight: bold; }
-            .card { border: 1px solid #ddd; padding: 20px; border-radius: 10px; margin-bottom: 20px; page-break-inside: avoid; }
-            .exceeded { border-left: 5px solid #ef4444; background: #fff1f2; }
-            .normal { border-left: 5px solid #10b981; background: #f0fdf4; }
-            .title { font-size: 1.1em; font-weight: bold; color: #1e40af; margin-bottom: 8px; }
-            .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; font-size: 0.85em; margin-bottom: 8px; }
-            .label { font-weight: bold; color: #666; }
-            .desc { font-size: 0.9em; margin-top: 8px; line-height: 1.4; border-top: 1px solid #eee; padding-top: 8px; }
-          </style>
-        </head>
-        <body>
-          <h1>Service Performance Report</h1>
-          <div class="meta">Technician: ${historyStaff} | Total Records: ${historyData.length}</div>
-          ${historyData.map(h => `
-            <div class="card ${h.is_exceeded ? 'exceeded' : 'normal'}">
-              <div class="title">CALL ${h.call_sequence}: ${h.client_name}</div>
-              <div class="grid">
-                <div><span class="label">Date:</span> ${new Date(h.report_date).toLocaleDateString()}</div>
-                <div><span class="label">Duration:</span> ${h.actual_duration}m (Limit: ${h.assigned_time}m)</div>
-                <div><span class="label">Status:</span> ${h.is_exceeded ? 'Exceeded' : 'On-Time'}</div>
-              </div>
-              <div class="desc"><strong>Work Details:</strong> ${h.complaint || 'N/A'}</div>
-              ${h.remarks ? `<div class="desc"><strong>Remarks:</strong> ${h.remarks}</div>` : ''}
-            </div>
-          `).join('')}
-        </body>
-      </html>
-    `);
-    win.document.close();
-    win.print();
+  const downloadExcel = () => {
+    const data = historyData;
+    if (!data.length) return alert("No data to export");
+
+    const headers = [
+      "Call #", "Client Name", "Date", "Start Time", "End Time",
+      "Location", "Duration (min)", "Limit (min)", "Status",
+      "KM", "Executive", "Technician", "Work Log", "Remarks"
+    ];
+
+    const rows = data.map(h => {
+      const startTime = h.start_time ? new Date(h.start_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) : '';
+      const endTime = h.end_time ? new Date(h.end_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) : '';
+      const date = h.report_date ? new Date(h.report_date).toLocaleDateString('en-IN') : '';
+      return [
+        h.call_sequence, h.client_name, date, startTime, endTime,
+        h.location || '', h.actual_duration, h.assigned_time,
+        h.is_exceeded ? 'Exceeded' : 'On-Time',
+        h.km || '', h.executive_name || '', historyStaff,
+        h.complaint || '', h.remarks || ''
+      ];
+    });
+
+    // Build CSV (Excel-compatible)
+    const csvContent = [headers, ...rows]
+      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ServiceReport_${historyStaff}_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const SectionTitle = ({ children }) => (
@@ -379,7 +378,7 @@ const CallReport = () => {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <SectionTitle>Staff & Session Info</SectionTitle>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-bold text-gray-500 uppercase">Executive Name (Sales)</label>
                 <input type="text" value={executiveName} onChange={e => setExecutiveName(e.target.value)} className="border rounded-lg px-3 py-2 outline-none text-sm focus:border-blue-500" placeholder="Sales Executive" />
@@ -387,10 +386,6 @@ const CallReport = () => {
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-bold text-gray-500 uppercase">Technician Name *</label>
                 <input type="text" value={staffName} onChange={e => setStaffName(e.target.value)} required className="border rounded-lg px-3 py-2 outline-none text-sm focus:border-blue-500" placeholder="Staff Name" />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-bold text-gray-500 uppercase">Session Date *</label>
-                <input type="date" value={reportDate} readOnly className="border rounded-lg px-3 py-2 outline-none text-sm bg-gray-50 cursor-not-allowed text-gray-600" />
               </div>
             </div>
 
@@ -411,12 +406,16 @@ const CallReport = () => {
                       <input type="text" value={call.client_name} onChange={e => updateCallField(call.id, "client_name", e.target.value)} required className="border rounded-lg px-3 py-2 outline-none text-sm bg-white" placeholder="Customer" />
                     </div>
                     <div className="flex flex-col gap-1">
+                      <label className="text-xs font-bold text-gray-500 uppercase">Call Date</label>
+                      <input type="date" value={call.call_date} readOnly className="border rounded-lg px-3 py-2 outline-none text-sm bg-gray-50 cursor-not-allowed text-gray-600" />
+                    </div>
+                    <div className="flex flex-col gap-1">
                       <label className="text-xs font-bold text-gray-500 uppercase">Start Time</label>
-                      <input type="datetime-local" value={call.start_time} onChange={e => updateCallField(call.id, "start_time", e.target.value)} className="border rounded-lg px-3 py-2 outline-none text-sm bg-white" />
+                      <input type="time" value={call.start_time} onChange={e => updateCallField(call.id, "start_time", e.target.value)} className="border rounded-lg px-3 py-2 outline-none text-sm bg-white" />
                     </div>
                     <div className="flex flex-col gap-1">
                       <label className="text-xs font-bold text-gray-500 uppercase">End Time</label>
-                      <input type="datetime-local" value={call.end_time} onChange={e => updateCallField(call.id, "end_time", e.target.value)} className="border rounded-lg px-3 py-2 outline-none text-sm bg-white" />
+                      <input type="time" value={call.end_time} onChange={e => updateCallField(call.id, "end_time", e.target.value)} className="border rounded-lg px-3 py-2 outline-none text-sm bg-white" />
                     </div>
                     <div className="flex flex-col gap-1">
                       <label className="text-xs font-bold text-gray-500 uppercase">Assigned Mins</label>
@@ -436,7 +435,7 @@ const CallReport = () => {
                     </div>
                     <div className="flex flex-col gap-1">
                       <label className="text-xs font-bold text-gray-500 uppercase text-gray-400">Duration</label>
-                      <div className={`px-3 py-2 rounded-lg text-sm font-bold border bg-white ${call.is_exceeded ? "text-red-600 border-red-200" : "text-green-600 border-green-200"}`}>{call.actual_duration}m {call.is_exceeded && "Exceeded"}</div>
+                      <div className={`px-3 py-2 rounded-lg text-sm font-bold border bg-white ${call.is_exceeded ? "text-red-600 border-red-200" : "text-green-600 border-green-200"}`}>{call.actual_duration}m {call.is_exceeded && "⚠ Exceeded"}</div>
                     </div>
                   </div>
 
@@ -480,28 +479,44 @@ const CallReport = () => {
                 <button onClick={applyDateFilter} className="bg-blue-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-blue-700">Filter</button>
                 <button onClick={() => { setFilterFrom(""); setFilterTo(""); openStaffHistory(historyStaff); }} className="text-gray-400 hover:text-red-500 text-xs font-bold">Clear</button>
               </div>
-              <button onClick={printReport} className="flex items-center gap-2 bg-slate-800 text-white px-5 py-2 rounded-lg text-xs font-bold hover:bg-black transition"><Printer size={16} /> Clean Report View</button>
+              <button onClick={downloadExcel} className="flex items-center gap-2 bg-green-700 text-white px-5 py-2 rounded-lg text-xs font-bold hover:bg-green-800 transition">⬇ Download XL</button>
               <X className="cursor-pointer text-gray-400 hover:text-red-500 ml-2" onClick={() => setHistoryOpen(false)} />
             </div>
           </div>
           <div className="mt-8 space-y-6">
             {historyData.map((h, idx) => (
-              <div key={idx} className={`p-6 rounded-xl border transition ${h.is_exceeded ? "bg-red-50/40 border-red-200" : "bg-white border-gray-100 shadow-sm"}`}>
-                <div className="flex flex-col lg:flex-row justify-between gap-6">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-3"><span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${h.is_exceeded ? "bg-red-600 text-white" : "bg-blue-600 text-white"}`}>CALL {h.call_sequence}</span><h4 className="font-bold text-xl text-gray-800">{h.client_name}</h4></div>
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-[11px] font-bold text-gray-400 mb-4 uppercase">
-                      <span className="flex items-center gap-1.5"><MapPin size={14} className="text-blue-500" /> {h.location || 'N/A'}</span>
-                      <span className="flex items-center gap-1.5"><Clock size={14} className="text-blue-500" /> {h.actual_duration}m Duration</span>
-                      <span className="flex items-center gap-1.5"><History size={14} className="text-blue-500" /> {h.assigned_time}m Limit</span>
-                      <span className="flex items-center gap-1.5"><Calendar size={14} className="text-blue-500" /> {new Date(h.report_date).toLocaleDateString()}</span>
-                    </div>
-                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 italic text-sm text-gray-700 leading-relaxed">
-                       <p className="text-[10px] font-black text-gray-300 uppercase mb-1">Services Done:</p>
-                       "{h.complaint || 'No work log provided.'}"
-                    </div>
+              <div key={idx} className={`p-5 rounded-xl border transition ${h.is_exceeded ? "bg-red-50/40 border-red-200" : "bg-white border-gray-100 shadow-sm"}`}>
+                {/* Header row */}
+                <div className="flex items-center gap-3 mb-3">
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${h.is_exceeded ? "bg-red-600 text-white" : "bg-blue-600 text-white"}`}>CALL {h.call_sequence}</span>
+                  <h4 className="font-bold text-lg text-gray-800">{h.client_name}</h4>
+                  {h.is_exceeded && <span className="ml-auto text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">⚠ Exceeded</span>}
+                </div>
+
+                {/* All details grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs font-semibold text-gray-500 mb-3 uppercase">
+                  <span className="flex items-center gap-1.5"><MapPin size={13} className="text-blue-500" /> {h.location || 'N/A'}</span>
+                  <span className="flex items-center gap-1.5"><Calendar size={13} className="text-blue-500" /> {h.report_date ? new Date(h.report_date).toLocaleDateString('en-IN') : '---'}</span>
+                  <span className="flex items-center gap-1.5"><Clock size={13} className="text-green-500" /> Start: {h.start_time ? new Date(h.start_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) : '---'}</span>
+                  <span className="flex items-center gap-1.5"><Clock size={13} className="text-red-400" /> End: {h.end_time ? new Date(h.end_time).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) : '---'}</span>
+                  <span className="flex items-center gap-1.5"><History size={13} className="text-blue-500" /> Duration: {h.actual_duration}m</span>
+                  <span className="flex items-center gap-1.5"><History size={13} className="text-gray-400" /> Limit: {h.assigned_time}m</span>
+                  {h.km && <span className="flex items-center gap-1.5">🛣 KM: {h.km}</span>}
+                  {h.executive_name && <span className="flex items-center gap-1.5">👤 Exec: {h.executive_name}</span>}
+                </div>
+
+                {/* Work log + Remarks */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 text-sm text-gray-700">
+                    <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Work Log / Services Done:</p>
+                    <p className="italic">"{h.complaint || 'No work log provided.'}"</p>
                   </div>
-                  {h.remarks && <div className="lg:w-1/3 bg-blue-50/50 p-5 rounded-xl border border-blue-100 self-start text-sm text-blue-800 italic"><strong>Remarks:</strong> "{h.remarks}"</div>}
+                  {h.remarks && (
+                    <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-100 text-sm text-blue-800">
+                      <p className="text-[10px] font-black text-blue-400 uppercase mb-1">Remarks:</p>
+                      <p className="italic">"{h.remarks}"</p>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

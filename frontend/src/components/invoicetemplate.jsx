@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import backheadImg from "../images/backhead.png";
+import logoImg from "../images/logo.png";
 
 // ─── DESIGN SYSTEM ─────────────────────────────────────────
 const PALETTE = {
@@ -155,7 +156,7 @@ const Header = ({ config, docNumber, docDate, formatDate }) => {
     <div style={{
       backgroundImage: `url(${backheadImg})`,
       backgroundSize: "cover",
-      backgroundPosition: "left center",
+      backgroundPosition: "left 35%",
       backgroundRepeat: "no-repeat",
       padding: "40px 40px 10px 40px",
       display: "flex",
@@ -163,9 +164,11 @@ const Header = ({ config, docNumber, docDate, formatDate }) => {
       alignItems: "center",
       position: "relative",
       overflow: "visible",
-      height: "140px",
+      height: "148px",
       width: "100%",
-      boxSizing: "border-box"
+      boxSizing: "border-box",
+      pageBreakInside: "avoid",
+      breakInside: "avoid"
     }}>
       {/* RIGHT - Document Title and Info - Dynamic content only */}
       <div style={{ 
@@ -326,14 +329,16 @@ const ItemsTable = ({ rows, h, fmt }) => {
               key={i}
               style={{
                 borderBottom: `1px solid ${PALETTE.border}44`,
+                pageBreakInside: "avoid",
+                breakInside: "avoid"
               }}
             >
               <td style={{ padding: "8px 8px", color: "#666" }}>{i + 1}</td>
-              <td style={{ padding: "8px 8px", color: "#1a1a1a" }}>
+              <td style={{ padding: "8px 8px", color: "#1a1a1a", verticalAlign: "top" }}>
                 {r.description.includes(',') ? (
                   <>
-                    <div style={{ fontWeight: "900", marginBottom: "2px" }}>{r.description.split(',')[0]}</div>
-                    <div style={{ fontSize: "11px", color: "#555", lineHeight: "1.2" }}>{r.description.split(',').slice(1).join(',')}</div>
+                    <div style={{ fontWeight: "800", fontSize: "13px", marginBottom: "3px" }}>{r.description.split(',')[0].trim()}</div>
+                    <div style={{ fontSize: "11px", color: "#555", lineHeight: "1.4" }}>{r.description.split(',').slice(1).join(',').trim()}</div>
                   </>
                 ) : (
                   <div style={{ fontWeight: "800" }}>{r.description}</div>
@@ -395,7 +400,7 @@ const Footer = ({ h }) => {
   };
   
   return (
-  <div style={{ padding: "0 40px 15px", background: PALETTE.white, fontFamily: "'Inter', sans-serif" }}>
+  <div style={{ padding: "0 40px 20px", position: "relative", background: PALETTE.white, fontFamily: "'Inter', sans-serif" }}>
     {/* Grid for Important Notes and Bank Details */}
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "25px" }}>
       {/* Important Notes */}
@@ -439,6 +444,16 @@ const Footer = ({ h }) => {
         {h.exec_email && <div style={{ fontSize: "10px", color: PALETTE.muted, fontWeight: "600" }}>{h.exec_email}</div>}
       </div>
     </div>
+
+    {/* Subtle Decorative Footer Line */}
+    <div style={{
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      width: "100%",
+      height: "5px",
+      background: `linear-gradient(90deg, ${PALETTE.primary}, ${PALETTE.accent}, #98C0DC)`
+    }} />
   </div>
 );
 };
@@ -524,27 +539,51 @@ const Invoice = ({ quotationId, type = "quotation", pdfMode = false }) => {
       }}
     >
       <div
+        className="invoice-pdf-root"
         style={{
           width: "210mm",
           background: PALETTE.white,
           boxShadow: pdfMode ? "none" : "0 10px 40px rgba(0,0,0,0.1)",
           borderRadius: "0px",
-          overflow: "hidden",
+          position: "relative",
           border: pdfMode ? "none" : `1px solid ${PALETTE.border}`,
         }}
       >
-        <Header
-          config={config}
-          docNumber={docNumber}
-          docDate={docDate}
-          formatDate={formatDate}
-        />
+        {/* WATERMARK — fixed per page via CSS */}
+        <style>{`
+          @page { size: A4; margin: 0; }
+          @media print {
+            body { margin: 0; }
+            .wm { position: fixed !important; top: 50% !important; left: 50% !important;
+              transform: translate(-50%,-50%) !important; z-index: 0 !important; }
+            .invoice-pdf-root { box-shadow: none !important; border: none !important; }
+          }
+          .wm {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%,-50%);
+            z-index: 0; opacity: 0.07; pointer-events: none;
+            width: 520px;
+          }
+        `}</style>
+        <div className="wm">
+          <img src={logoImg} alt="" style={{ width: "100%", objectFit: "contain" }} />
+        </div>
 
-        <AddressRow h={h} />
-
-        <ItemsTable rows={rows} h={h} fmt={fmt} />
-
-        <Footer h={h} />
+        {/* Use table layout so header/footer repeat on every printed page */}
+        <table style={{ width: "100%", borderCollapse: "collapse", position: "relative", zIndex: 1 }}>
+          <thead style={{ display: "table-header-group" }}>
+            <tr><td style={{ padding: 0, border: "none" }}>
+              <Header config={config} docNumber={docNumber} docDate={docDate} formatDate={formatDate} />
+            </td></tr>
+          </thead>
+          <tbody>
+            <tr><td style={{ padding: 0, border: "none" }}>
+              <AddressRow h={h} />
+              <ItemsTable rows={rows} h={h} fmt={fmt} />
+              <Footer h={h} />
+            </td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
   );

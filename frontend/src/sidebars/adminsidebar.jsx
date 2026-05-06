@@ -1,28 +1,38 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
-  Home,
-  Users,
-  FolderKanban,
-  ListTodo,
-  Phone,
-  ShoppingCart,
-  FileText,
-  Briefcase,
-  Headphones,
-  Users2,
-  BarChart2,
-  ChevronDown,
-   Wrench
+  Home, Users, FolderKanban, ListTodo, Phone, ShoppingCart,
+  FileText, Briefcase, Headphones, Users2, BarChart2, ChevronDown, Wrench, Bell
 } from "lucide-react";
-import "../Styles/tailwind.css"
+import "../Styles/tailwind.css";
 import { Link } from "react-router-dom";
+import axios from "axios";
 
 
 const Sidebar = ({ onNavigate }) => {
   const [openMenu, setOpenMenu] = useState(null);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    const fetchPending = async () => {
+      try {
+        const res = await axios.get("http://localhost:3000/api/auth/notifications");
+        // Count unread notifications (is_read = 0)
+        const unreadCount = res.data.filter(n => n.is_read === 0).length;
+        setPendingCount(unreadCount);
+      } catch (_) {}
+    };
+    fetchPending();
+    const interval = setInterval(fetchPending, 30000);
+    window.addEventListener("refresh-pending-count", fetchPending);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("refresh-pending-count", fetchPending);
+    };
+  }, []);
 
   const menu = [
-    { icon: <Home size={20} />, title: "Dashboard",path: "/dashboard" },
+    { icon: <Home size={20} />, title: "Dashboard", path: "/dashboard" },
+    { icon: <Bell size={20} />, title: "Notifications", path: "/dashboard/notifications", badge: pendingCount },
     { icon: <Users size={20} />, title: "Customers", subitems: [{label: "Clients", path: "/dashboard/clients"}] },
     { icon: <FolderKanban size={20} />, title: "Projects",  subitems: [
         { label: "Project", path: "/project" },
@@ -77,6 +87,11 @@ const Sidebar = ({ onNavigate }) => {
               {item.icon}
               <span>{item.title}</span>
             </div>
+            {item.badge > 0 && (
+              <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                {item.badge}
+              </span>
+            )}
           </Link>
         ) : (
           <>

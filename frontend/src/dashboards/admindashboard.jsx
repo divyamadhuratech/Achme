@@ -27,6 +27,8 @@ const Dashboard = () => {
   const [fields, setFields] = useState([]);
   const [team, setTeam] = useState([]);
   const [performaInvoices, setPerformaInvoices] = useState([]);
+  const [escalations, setEscalations] = useState([]);
+  const [showEscalations, setShowEscalations] = useState(false);
 
   const [activeTelecall, setActiveTelecall] = useState("New");
   const [activeWalkin, setActiveWalkin] = useState("New");
@@ -49,6 +51,12 @@ const Dashboard = () => {
     setFields(f.data);
     setTeam(tm.data);
     setPerformaInvoices(pi.data);
+    // Check missed reminders and fetch escalations
+    try {
+      await axios.post("http://localhost:3000/api/leads/check-missed");
+      const esc = await axios.get("http://localhost:3000/api/leads/escalations");
+      setEscalations(esc.data);
+    } catch (_) {}
   };
 
   useEffect(() => { fetchAll(); }, []);
@@ -429,6 +437,59 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+
+    {/* ── Escalation Notifications Panel (Admin Only) ─────────────────── */}
+    {escalations.length > 0 && (
+      <div className="mt-8 rounded-xl border border-red-200 bg-red-50/40 p-5 shadow-sm">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-base font-bold text-red-700 flex items-center gap-2">
+            ⚠ Escalation Alerts
+            <span className="bg-red-600 text-white text-xs px-2 py-0.5 rounded-full">{escalations.length}</span>
+          </h2>
+          <button onClick={() => setShowEscalations(p => !p)} className="text-xs text-red-600 font-bold hover:underline">
+            {showEscalations ? "Hide" : "Show All"}
+          </button>
+        </div>
+        {showEscalations && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="text-xs font-bold text-red-600 uppercase border-b border-red-200">
+                  <th className="px-3 py-2 text-left">Lead Name</th>
+                  <th className="px-3 py-2">Mobile</th>
+                  <th className="px-3 py-2">Staff</th>
+                  <th className="px-3 py-2">Last Follow-up</th>
+                  <th className="px-3 py-2">Missed</th>
+                  <th className="px-3 py-2">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {escalations.map(esc => (
+                  <tr key={esc.id} className="border-b border-red-100 hover:bg-red-50">
+                    <td className="px-3 py-2 font-semibold text-gray-800">{esc.customer_name}</td>
+                    <td className="px-3 py-2 text-center text-gray-600">{esc.mobile_number}</td>
+                    <td className="px-3 py-2 text-center text-gray-600">{esc.staff_name || "---"}</td>
+                    <td className="px-3 py-2 text-center text-gray-500 text-xs">{esc.last_followup_date ? new Date(esc.last_followup_date).toLocaleDateString("en-IN") : "---"}</td>
+                    <td className="px-3 py-2 text-center">
+                      <span className="bg-red-600 text-white text-xs px-2 py-0.5 rounded-full font-bold">{esc.missed_count}</span>
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <button
+                        onClick={async () => {
+                          await axios.put(`http://localhost:3000/api/leads/escalations/${esc.id}/resolve`);
+                          setEscalations(prev => prev.filter(x => x.id !== esc.id));
+                        }}
+                        className="text-xs bg-green-600 text-white px-3 py-1 rounded-lg hover:bg-green-700 font-bold"
+                      >Resolve</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    )}
     </div>
   );
 };

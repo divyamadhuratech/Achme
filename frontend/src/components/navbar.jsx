@@ -19,7 +19,7 @@ import { useAuth } from "../auth/AuthContext";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
-const Topbar = ({ onHamburgerClick, showSearch, onSearch, reminderData, reminderNotes }) => {
+const Topbar = ({ onHamburgerClick, showSearch, onSearch, reminderData, reminderNotes, escalationCount = 0, escalations = [] }) => {
   const [openProfile, setOpenProfile] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const bellRef = useRef(null);
@@ -27,6 +27,8 @@ const Topbar = ({ onHamburgerClick, showSearch, onSearch, reminderData, reminder
   const [openSettings, setOpenSettings] = useState(false);
   const [openReminder, setOpenReminder] = useState(false);
   const [openStar, setOpenStar] = useState(false);
+  const [openLeadAlerts, setOpenLeadAlerts] = useState(false);
+  const leadAlertRef = useRef(null);
   const settingsRef = useRef(null);
   const reminderRef = useRef(null);
   const starRef = useRef(null);
@@ -55,6 +57,7 @@ const Topbar = ({ onHamburgerClick, showSearch, onSearch, reminderData, reminder
       if (bellRef.current && !bellRef.current.contains(e.target)) setOpenBell(false);
       if (reminderRef.current && !reminderRef.current.contains(e.target)) setOpenReminder(false);
       if (starRef.current && !starRef.current.contains(e.target)) setOpenStar(false);
+      if (leadAlertRef.current && !leadAlertRef.current.contains(e.target)) setOpenLeadAlerts(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -172,6 +175,55 @@ const Topbar = ({ onHamburgerClick, showSearch, onSearch, reminderData, reminder
               </div>
             )}
           </li>
+
+          {/* Lead Alerts → Escalation notifications (Admin only) */}
+          {user?.role === "admin" && (
+          <li ref={leadAlertRef} className="relative cursor-pointer" title="Lead Alerts">
+            <AlertCircle
+              size={20}
+              onClick={() => setOpenLeadAlerts(p => !p)}
+              className={`hover:text-red-500 transition ${escalationCount > 0 ? "text-red-500" : ""}`}
+            />
+            {escalationCount > 0 && (
+              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-1.5 rounded-full font-bold">
+                {escalationCount}
+              </span>
+            )}
+            {openLeadAlerts && (
+              <div className="absolute right-0 top-10 w-96 bg-white shadow-xl rounded-xl border z-50 overflow-hidden">
+                <div className="px-4 py-3 border-b font-semibold text-sm text-gray-700 flex justify-between items-center bg-red-50">
+                  <span className="flex items-center gap-2 text-red-700">
+                    <AlertCircle size={15} /> Lead Escalation Alerts
+                    {escalationCount > 0 && <span className="bg-red-600 text-white text-xs px-2 py-0.5 rounded-full">{escalationCount}</span>}
+                  </span>
+                  <X size={14} className="cursor-pointer text-gray-400 hover:text-red-500" onClick={() => setOpenLeadAlerts(false)} />
+                </div>
+                {escalations.length === 0 ? (
+                  <div className="p-4 text-sm text-gray-400 text-center">No escalation alerts</div>
+                ) : (
+                  <div className="max-h-72 overflow-y-auto divide-y">
+                    {escalations.map(esc => (
+                      <div key={esc.id} className={`px-4 py-3 hover:bg-red-50 transition ${esc.missed_count >= 3 ? "bg-red-50/50" : ""}`}>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="text-sm font-semibold text-gray-800">{esc.customer_name}</p>
+                            <p className="text-xs text-gray-500">{esc.mobile_number} · {esc.staff_name || "Unassigned"}</p>
+                            {esc.last_followup_date && (
+                              <p className="text-xs text-gray-400 mt-0.5">Last follow-up: {new Date(esc.last_followup_date).toLocaleDateString("en-IN")}</p>
+                            )}
+                          </div>
+                          <span className={`text-xs font-bold px-2 py-1 rounded-full ${esc.missed_count >= 3 ? "bg-red-600 text-white" : "bg-orange-100 text-orange-700"}`}>
+                            {esc.missed_count} missed
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </li>
+          )}
 
           {/* Bell → Task Notifications (unchanged) */}
           <li ref={bellRef} className="relative cursor-pointer">

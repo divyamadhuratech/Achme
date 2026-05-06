@@ -44,34 +44,39 @@ router.post("/register", async (req, res) => {
   }
 
   db.query(
-    `SELECT * FROM email_otp
-     WHERE email=? AND otp=? AND expires_at > NOW()`,
+    `SELECT * FROM email_otp WHERE email=? AND otp=? AND expires_at > NOW()`,
     [email, otp],
     async (err, rows) => {
-      if (!rows.length) {
+      if (!rows || !rows.length) {
         return res.status(400).json({ message: "Invalid or expired OTP" });
       }
 
       const hash = await bcrypt.hash(user_password, 10);
+      const userRole = role || "user";
+      // All new registrations start as pending — admin must approve
+      const status = "pending";
 
       db.query(
-        `INSERT INTO users (first_name, email, user_password, role)
-         VALUES (?,?,?,?)`,
-        [first_name, email, hash, role || "user"],
-        (err) => {
+        `INSERT INTO users (first_name, email, user_password, role, status) VALUES (?,?,?,?,?)`,
+        [first_name, email, hash, userRole, status],
+        (err, result) => {
           if (err) {
             if (err.code === "ER_DUP_ENTRY") {
-              return res
-                .status(409)
-                .json({ message: "Email already registered" });
+              return res.status(409).json({ message: "Email already registered" });
             }
             return res.status(500).json({ message: "Server error" });
           }
 
-          // delete OTP after success
+          const newUserId = result.insertId;
           db.query(`DELETE FROM email_otp WHERE email=?`, [email]);
 
-          res.json({ message: "Registered successfully" });
+          // Create admin notification
+          db.query(
+            `INSERT INTO admin_notifications (type, user_id, message) VALUES ('registration', ?, ?)`,
+            [newUserId, `New ${userRole} registration: ${first_name} (${email}) is waiting for approval.`]
+          );
+
+          res.json({ message: "Registration successful. Your account is pending admin approval." });
         }
       );
     }
@@ -86,64 +91,112 @@ router.post("/login", (req, res) => {
     return res.status(400).json({ message: "Email and OTP required" });
   }
 
-  db.query(
-    `SELECT u.id, u.first_name, u.email, u.role
-     FROM users u
-     JOIN email_otp o ON u.email = o.email
-     WHERE u.email=? AND o.otp=? AND o.expires_at > NOW()`,
-    [email, otp],
-    (err, rows) => {
-      if (err) return res.status(500).json({ message: "Server error" });
+  // First check if the user account exists at all
+  db.query(`SELECT id, first_name, email, role, status FROM users WHERE email=?`, [email.trim().toLowerCase()], (err, userRows) => {
+    if (err) return res.status(500).json({ message: "Server error" });
 
-      if (!rows.length) {
-        return res.status(401).json({ message: "Invalid or expired OTP" });
-      }
-
-      const user = rows[0];
-
-      const token = jwt.sign(
-        { id: user.id, role: user.role },
-        process.env.JWT_SECRET,
-        { expiresIn: "1d" }
-      );
-
-      // delete OTP after successful login
-      db.query(`DELETE FROM email_otp WHERE email=?`, [email]);
-
-      res.json({
-        token,
-        user: {
-          id: user.id,
-          name: user.first_name,
-          email: user.email,
-          role: user.role,
-        },
-      });
+    if (!userRows.length) {
+      return res.status(404).json({ message: "No account found with this email. Please register first." });
     }
-  );
+
+    const user = userRows[0];
+
+    // Check status before OTP
+    if (user.status === "pending") {
+      return res.status(403).json({ message: "Your account is waiting for admin approval. Please wait for confirmation." });
+    }
+    if (user.status === "rejected") {
+      return res.status(403).json({ message: "Your account access has been rejected. Please contact the admin." });
+    }
+
+    // Now verify OTP
+    db.query(
+      `SELECT * FROM email_otp WHERE email=? AND otp=? AND expires_at > NOW()`,
+      [email.trim().toLowerCase(), otp],
+      (err2, otpRows) => {
+        if (err2) return res.status(500).json({ message: "Server error" });
+
+        if (!otpRows.length) {
+          return res.status(401).json({ message: "Invalid or expired OTP. Please request a new one." });
+        }
+
+        const token = jwt.sign(
+          { id: user.id, role: user.role },
+          process.env.JWT_SECRET,
+          { expiresIn: "1d" }
+        );
+
+        db.query(`DELETE FROM email_otp WHERE email=?`, [email]);
+
+        res.json({
+          token,
+          user: { id: user.id, name: user.first_name, email: user.email, role: user.role },
+        });
+      }
+    );
+  });
 });
 
 /* ================= GET ALL USERS ================= */
 
 router.get("/users", (req, res) => {
   const query = `
-    SELECT 
-      u.id,
-      u.first_name,
-      t.job_title AS position,
-      t.emp_role AS empRole,
-      u.role AS systemRole
-    FROM users u
-    LEFT JOIN teammember t 
-      ON u.email = t.emp_email
+    SELECT u.id, u.first_name, t.job_title AS position, t.emp_role AS empRole, u.role AS systemRole
+    FROM users u LEFT JOIN teammember t ON u.email = t.emp_email
   `;
-
   db.query(query, (err, results) => {
-    if (err) {
-      console.error("Error fetching users:", err);
-      return res.status(500).json({ message: "Database error" });
-    }
+    if (err) return res.status(500).json({ message: "Database error" });
     res.json(results);
+  });
+});
+
+/* ================= ADMIN: PENDING REGISTRATIONS ================= */
+
+router.get("/pending-users", (req, res) => {
+  db.query(
+    `SELECT id, first_name, email, role, status, created_at FROM users WHERE status='pending' ORDER BY created_at DESC`,
+    (err, rows) => {
+      if (err) return res.status(500).json({ message: "DB error" });
+      res.json(rows);
+    }
+  );
+});
+
+/* ================= ADMIN: APPROVE / REJECT ================= */
+
+router.put("/approve/:id", (req, res) => {
+  const { action } = req.body; // "active" or "rejected"
+  if (!["active", "rejected"].includes(action)) {
+    return res.status(400).json({ message: "Invalid action" });
+  }
+  db.query(`UPDATE users SET status=? WHERE id=?`, [action, req.params.id], (err) => {
+    if (err) return res.status(500).json({ message: "DB error" });
+    // Mark notification as read
+    db.query(`UPDATE admin_notifications SET is_read=1 WHERE user_id=?`, [req.params.id]);
+    res.json({ message: `User ${action}` });
+  });
+});
+
+/* ================= ADMIN: NOTIFICATIONS ================= */
+
+router.get("/notifications", (req, res) => {
+  db.query(
+    `SELECT n.id, n.type, n.message, n.is_read, n.created_at, n.user_id,
+            u.first_name, u.email, u.role, u.status
+     FROM admin_notifications n
+     INNER JOIN users u ON u.id = n.user_id
+     ORDER BY n.created_at DESC`,
+    (err, rows) => {
+      if (err) return res.status(500).json({ message: "DB error", error: err.message });
+      res.json(rows);
+    }
+  );
+});
+
+router.put("/notifications/:id/read", (req, res) => {
+  db.query(`UPDATE admin_notifications SET is_read=1 WHERE id=?`, [req.params.id], (err) => {
+    if (err) return res.status(500).json({ message: "DB error" });
+    res.json({ message: "Marked read" });
   });
 });
 
